@@ -1,0 +1,2046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home Recovery</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f0e8; --surface: #faf7f2; --surface2: #ede8df; --surface3: #e0d9ce;
+    --border: #d4cdc2; --accent: #2d5a8e; --accent-dim: rgba(45,90,142,0.1);
+    --text: #1e2530; --text2: #4a5568; --text3: #7a8699;
+    --red: #c0392b; --red-dim: rgba(192,57,43,0.1);
+    --amber: #b7770d; --amber-dim: rgba(183,119,13,0.1);
+    --blue: #077FFF; --blue-dim: rgba(7,127,255,0.1);
+    --purple: #6b46c1; --purple-dim: rgba(107,70,193,0.1);
+    --radius: 14px; --radius-sm: 8px;
+  }
+  body.dark-mode {
+    --bg: #0d1117; --surface: #161c26; --surface2: #1e2736; --surface3: #263044;
+    --border: #2a3649; --accent: #5b8ed4; --accent-dim: rgba(91,142,212,0.15);
+    --text: #e8edf5; --text2: #8a9ab5; --text3: #5a6a82;
+    --red: #e05c6a; --red-dim: rgba(224,92,106,0.12);
+    --amber: #f0a847; --amber-dim: rgba(240,168,71,0.12);
+    --blue: #5b8ed4; --blue-dim: rgba(91,142,212,0.12);
+    --purple: #c084fc; --purple-dim: rgba(192,132,252,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; min-height: 100vh; max-width: 480px; margin: 0 auto; padding-bottom: 80px; }
+
+  /* HEADER */
+  header { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 1.2rem; font-weight: 600; color: var(--accent); margin-bottom: 10px; }
+  .sync-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 0.7rem; color: var(--text3); }
+  .sync-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); transition: background 0.3s; }
+  .sync-dot.ok { background: var(--accent); } .sync-dot.err { background: var(--red); }
+  .date-nav { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .date-nav-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text2); padding: 7px 14px; cursor: pointer; font-size: 1.1rem; line-height: 1; flex-shrink: 0; transition: border-color 0.15s; }
+  .date-nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .date-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .date-display { flex: 1; text-align: center; cursor: pointer; }
+  .date-display-label { font-size: 0.95rem; font-weight: 600; color: var(--text); display: block; }
+  .date-display-sub { font-size: 0.7rem; color: var(--text3); margin-top: 1px; display: block; min-height: 14px; }
+  .date-picker-input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+  .past-mode-banner { background: var(--amber-dim); border: 1px solid var(--amber); border-radius: var(--radius-sm); padding: 8px 14px; font-size: 0.78rem; color: var(--amber); margin-top: 10px; display: none; text-align: center; }
+  .past-mode-banner.show { display: block; }
+
+  /* TABS */
+  .tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab-btn { flex: 1; min-width: 55px; padding: 12px 2px; background: none; border: none; color: var(--text3); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.62rem; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-pane { display: none; padding: 20px; } .tab-pane.active { display: block; }
+  .section-title { font-size: 0.85rem; font-weight: 600; color: var(--text2); margin-bottom: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+  .graph-wrap { position: relative; width: 100%; height: 180px; }
+
+  /* LOADING */
+  .loading-overlay { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 999; gap: 12px; }
+  .loading-overlay p { color: var(--text3); font-size: 0.85rem; }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* FORMS */
+  .form-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.85rem; padding: 9px 12px; outline: none; margin-bottom: 8px; }
+  .form-input::placeholder { color: var(--text3); }
+  .form-input:focus { border-color: var(--accent); }
+  .field-label { font-size: 0.75rem; color: var(--text3); display: block; margin-bottom: 5px; }
+  .field-group { margin-bottom: 10px; }
+  .add-med-btn { width: 100%; padding: 10px; background: var(--accent-dim); border: 1px solid var(--accent); border-radius: var(--radius-sm); color: var(--accent); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+  .add-med-btn:hover { background: rgba(94,207,177,0.2); }
+  .add-med-card { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; }
+
+  /* STATS */
+  .stat-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; text-align: center; }
+  .stat-val { font-family: 'DM Mono', monospace; font-size: 1.1rem; font-weight: 500; color: var(--accent); }
+  .stat-label { font-size: 0.68rem; color: var(--text3); margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; align-items: flex-end; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; padding: 24px 20px 32px; width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto; }
+  .modal h3 { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+  .modal p { font-size: 0.82rem; color: var(--text3); margin-bottom: 14px; }
+  .modal-btns { display: flex; gap: 10px; margin-top: 10px; }
+  .modal-cancel { flex: 1; padding: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text2); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; cursor: pointer; }
+  .modal-confirm { flex: 1; padding: 12px; background: var(--accent); border: none; border-radius: var(--radius-sm); color: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+  .modal-confirm.danger { background: var(--red); color: #fff; }
+  .modal-comment-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.85rem; padding: 9px 12px; outline: none; }
+  .modal-comment-input::placeholder { color: var(--text3); }
+
+  /* EMPTY STATE */
+  .empty-state { text-align: center; color: var(--text3); font-size: 0.85rem; padding: 40px 20px; }
+
+  /* ── MEDICATIONS ── */
+  .med-section-header { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text3); margin: 0 0 12px; padding: 8px 14px; background: var(--surface2); border-radius: var(--radius-sm); }
+  .med-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; transition: border-color 0.3s; }
+  .med-card.ready { border-color: var(--accent); }
+  .med-card.waiting { border-color: var(--border); }
+  .med-card.missed { border-color: var(--red); }
+  .dose-count-badge { font-size: 0.68rem; font-family: 'DM Mono', monospace; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; color: var(--text3); margin-left: 6px; }
+  .med-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .med-name { font-size: 1rem; font-weight: 600; }
+  .med-meta { display: flex; align-items: center; gap: 6px; }
+  .med-interval { font-size: 0.72rem; color: var(--text3); background: var(--surface2); padding: 3px 8px; border-radius: 20px; }
+  .med-delete-btn { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 0.8rem; padding: 3px 6px; border-radius: 4px; }
+  .med-delete-btn:hover { color: var(--red); background: var(--red-dim); }
+  .med-status { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .status-badge { font-size: 0.75rem; font-weight: 500; padding: 4px 10px; border-radius: 20px; }
+  .status-badge.ready   { background: var(--accent-dim); color: var(--accent); }
+  .status-badge.waiting { background: var(--amber-dim);  color: var(--amber); }
+  .status-badge.never   { background: var(--surface2);   color: var(--text2); }
+  .status-badge.taken   { background: var(--surface2);   color: var(--text2); }
+  .status-badge.missed  { background: var(--red-dim);    color: var(--red); }
+  .countdown { font-family: 'DM Mono', monospace; font-size: 0.85rem; color: var(--text2); }
+  .med-times { font-size: 0.72rem; color: var(--text3); margin-bottom: 12px; line-height: 1.8; }
+  .med-times .next-time { color: var(--accent); font-family: 'DM Mono', monospace; font-weight: 500; }
+  .strength-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .strength-btn { flex: 1; min-width: 60px; padding: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text2); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.82rem; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .strength-btn.selected { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .take-btn { width: 100%; padding: 10px; background: var(--accent); border: none; border-radius: var(--radius-sm); color: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s; }
+  .take-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .take-btn.disabled { background: var(--surface3); color: var(--text3); cursor: not-allowed; transform: none; }
+  .topup-btn { width: 100%; padding: 10px; background: none; border: 1px solid var(--amber); border-radius: var(--radius-sm); color: var(--amber); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background 0.15s; }
+  .topup-btn:hover { background: var(--amber-dim); }
+  .topup-btn.disabled { border-color: var(--border); color: var(--text3); cursor: not-allowed; background: none; }
+  .topup-info { font-size: 0.72rem; color: var(--text3); margin-top: 5px; text-align: center; }
+  .backdate-toggle { background: none; border: none; color: var(--text3); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.72rem; cursor: pointer; margin-top: 8px; text-decoration: underline; text-decoration-style: dotted; display: block; }
+  .backdate-row { display: none; gap: 8px; margin-top: 8px; align-items: center; }
+  .backdate-row.show { display: flex; }
+  .backdate-row input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.8rem; padding: 7px 10px; outline: none; }
+  .backdate-row input:focus { border-color: var(--accent); }
+  .backdate-row button { padding: 7px 12px; background: var(--surface3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text2); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.8rem; cursor: pointer; }
+  .med-history-btn { background: none; border: none; color: var(--text3); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.72rem; cursor: pointer; margin-top: 8px; text-decoration: underline; text-decoration-style: dotted; display: block; }
+  .med-history-btn:hover { color: var(--accent); }
+
+  /* Scheduled section */
+  .schedule-section { margin-bottom: 20px; }
+  .schedule-slot { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 8px; }
+  .schedule-slot.missed-slot { border-color: var(--red); background: var(--red-dim); }
+  .schedule-slot-time { font-family: 'DM Mono', monospace; font-size: 0.9rem; color: var(--accent); font-weight: 600; }
+  .schedule-slot-meds { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+  .schedule-med-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .schedule-med-name { font-size: 0.88rem; color: var(--text); flex: 1; }
+  .schedule-med-taken { font-size: 0.72rem; color: var(--accent); font-family: 'DM Mono', monospace; }
+  .schedule-check-btn { padding: 6px 14px; background: var(--accent); border: none; border-radius: var(--radius-sm); color: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.8rem; font-weight: 600; cursor: pointer; flex-shrink: 0; }
+  .schedule-check-btn.taken { background: var(--surface3); color: var(--text3); cursor: default; }
+  .missed-actions { display: flex; gap: 6px; margin-top: 10px; }
+  .missed-action-btn { flex: 1; padding: 7px 4px; font-size: 0.75rem; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 500; border-radius: var(--radius-sm); cursor: pointer; border: 1px solid var(--border); background: var(--surface3); color: var(--text2); }
+  .missed-action-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .missed-action-btn.danger:hover { border-color: var(--red); color: var(--red); }
+  .due-soon-card { background: var(--accent-dim); border: 1px solid var(--accent); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; }
+  .due-soon-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--accent); margin-bottom: 10px; }
+  .due-soon-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(94,207,177,0.15); }
+  .due-soon-item:last-child { border-bottom: none; }
+  .due-soon-name { font-size: 0.88rem; }
+  .due-soon-time { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--accent); }
+
+  /* MED HISTORY DRAWER */
+  .med-hist-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 300; align-items: flex-end; justify-content: center; }
+  .med-hist-overlay.show { display: flex; }
+  .med-hist-drawer { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; padding: 24px 20px 36px; width: 100%; max-width: 480px; max-height: 80vh; display: flex; flex-direction: column; }
+  .med-hist-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .med-hist-header h3 { font-size: 1rem; font-weight: 600; }
+  .med-hist-close { background: none; border: none; color: var(--text3); font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 2px 6px; }
+  .med-hist-content { overflow-y: auto; flex: 1; }
+  .med-hist-day { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text3); margin: 12px 0 6px; font-weight: 600; }
+  .med-hist-day:first-child { margin-top: 0; }
+  .med-hist-entry { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 5px; }
+  .med-hist-time { font-family: 'DM Mono', monospace; font-size: 0.82rem; color: var(--accent); }
+  .med-hist-detail { font-size: 0.78rem; color: var(--text3); }
+  .med-hist-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 1rem; margin-left: auto; padding-left: 10px; flex-shrink: 0; }
+  .med-hist-del:hover { color: var(--red); }
+  .med-hist-none { text-align: center; color: var(--text3); font-size: 0.85rem; padding: 30px 0; }
+
+  /* OXY COUNTER */
+  .counter-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: none; padding: 14px 16px; margin-bottom: 0; }
+  .counter-card + .med-card { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+  /* ── PAIN ── */
+  .pain-subtabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .pain-subtab { flex: 1; padding: 8px 4px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text3); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.75rem; font-weight: 500; cursor: pointer; text-align: center; transition: all 0.15s; }
+  .pain-subtab.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+  .pain-subpane { display: none; } .pain-subpane.active { display: block; }
+  .score-row { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-bottom: 4px; }
+  .score-btn { padding: 7px 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface2); color: var(--text2); font-family: 'DM Mono', monospace; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.15s; text-align: center; }
+  .score-btn.half { font-size: 0.65rem; color: var(--text3); }
+  .score-btn.sel-low  { background: rgba(94,207,177,0.2);  border-color: #5ecfb1; color: #5ecfb1; }
+  .score-btn.sel-mid  { background: rgba(240,168,71,0.2);  border-color: #f0a847; color: #f0a847; }
+  .score-btn.sel-high { background: rgba(224,140,80,0.2);  border-color: #e08c50; color: #e08c50; }
+  .score-btn.sel-max  { background: rgba(224,92,106,0.2);  border-color: #e05c6a; color: #e05c6a; }
+  .score-row-label { font-size: 0.65rem; color: var(--text3); margin-bottom: 3px; }
+  .pain-scale-label { display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--text3); margin: 4px 0 10px; }
+  .pain-comment-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.85rem; padding: 9px 12px; outline: none; margin-bottom: 8px; }
+  .pain-comment-input::placeholder { color: var(--text3); }
+  .pain-comment-input:focus { border-color: var(--accent); }
+  .pain-log-btn { width: 100%; padding: 11px; background: var(--accent); border: none; border-radius: var(--radius-sm); color: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+  .pain-log-btn:disabled { background: var(--surface3); color: var(--text3); cursor: not-allowed; }
+  .pain-slot { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 6px; }
+  .pain-slot.logged { background: var(--surface); }
+  .pain-slot-time { font-family: 'DM Mono', monospace; font-size: 0.82rem; color: var(--text3); flex-shrink: 0; min-width: 44px; }
+  .pain-slot-score { font-family: 'DM Mono', monospace; font-size: 1rem; font-weight: 600; margin: 0 6px; }
+  .pain-slot-comment { font-size: 0.75rem; color: var(--text3); flex: 1; margin: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pain-slot-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 0.9rem; flex-shrink: 0; }
+  .pain-slot-del:hover { color: var(--red); }
+  .pain-slot-empty { font-size: 0.78rem; color: var(--text3); font-style: italic; flex: 1; }
+  .pain-slot-log-btn { font-size: 0.72rem; background: var(--surface3); border: 1px solid var(--border); border-radius: 6px; color: var(--text3); padding: 3px 8px; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; flex-shrink: 0; }
+  .pain-slot-log-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .day-toggles { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .day-pill { padding: 5px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 500; font-family: 'Plus Jakarta Sans', sans-serif; border: 1px solid var(--border); background: var(--surface2); color: var(--text3); cursor: pointer; transition: all 0.15s; }
+  .day-pill.active { border-color: var(--pill-c, var(--accent)); background: color-mix(in srgb, var(--pill-c, var(--accent)) 15%, transparent); color: var(--pill-c, var(--accent)); }
+
+  /* ── WALK ── */
+  .walk-progress { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; }
+  .walk-progress-label { font-size: 0.82rem; color: var(--text2); }
+  .walk-progress-count { font-family: 'DM Mono', monospace; font-size: 1rem; color: var(--accent); font-weight: 500; margin-left: 16px; }
+  .progress-bar-wrap { background: var(--surface2); border-radius: 4px; height: 4px; margin-top: 8px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.4s ease; }
+  .walk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .walk-slot { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s; user-select: none; }
+  .walk-slot.done { background: var(--accent-dim); border-color: var(--accent); }
+  .walk-slot.readonly { cursor: default; }
+  .walk-checkbox { width: 18px; height: 18px; border: 2px solid var(--border); border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .walk-slot.done .walk-checkbox { background: var(--accent); border-color: var(--accent); }
+  .walk-checkmark { color: #0d1117; font-size: 0.7rem; font-weight: 700; display: none; }
+  .walk-slot.done .walk-checkmark { display: block; }
+  .walk-time { font-family: 'DM Mono', monospace; font-size: 0.88rem; color: var(--text2); }
+  .walk-slot.done .walk-time { color: var(--accent); }
+
+  /* ── WEIGHT ── */
+  .weight-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .weight-row input[type="number"] { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'DM Mono', monospace; font-size: 1rem; padding: 10px 14px; outline: none; }
+  .weight-row input[type="number"]::placeholder { color: var(--text3); }
+  .weight-row input[type="number"]:focus { border-color: var(--accent); }
+  .weight-row input[type="date"] { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.85rem; padding: 10px 14px; outline: none; }
+  .weight-row input[type="date"]:focus { border-color: var(--accent); }
+  .weight-row button { padding: 10px 18px; background: var(--accent); border: none; border-radius: var(--radius-sm); color: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .past-toggle { background: none; border: none; color: var(--text3); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.72rem; cursor: pointer; text-decoration: underline; text-decoration-style: dotted; display: block; margin-top: 4px; }
+  .past-section { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .past-section.show { display: block; }
+  .weight-day-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+  .weight-day-val { font-family: 'DM Mono', monospace; font-size: 1.8rem; font-weight: 600; color: var(--accent); }
+  .weight-none { color: var(--text3); font-size: 0.85rem; margin-top: 4px; }
+  .weight-entry-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 0.85rem; }
+  .weight-entry-del:hover { color: var(--red); }
+
+  /* ── FOOD ── */
+  .food-input-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .food-input-row input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; padding: 10px 14px; outline: none; }
+  .food-input-row input::placeholder { color: var(--text3); }
+  .food-input-row input:focus { border-color: var(--accent); }
+  .food-input-row button { padding: 10px 16px; background: var(--accent); border: none; border-radius: var(--radius-sm); color: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+  .food-entry { display: flex; align-items: center; padding: 10px 14px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 6px; gap: 8px; }
+  .food-entry-text { flex: 1; font-size: 0.88rem; }
+  .food-entry-time { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text3); flex-shrink: 0; }
+  .food-entry-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
+  .food-entry-del:hover { color: var(--red); }
+  .wishlist-btn { width: 100%; padding: 11px; background: none; border: 1px solid var(--amber); border-radius: var(--radius-sm); color: var(--amber); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; transition: background 0.15s; }
+  .wishlist-btn:hover { background: var(--amber-dim); }
+  .wishlist-count { background: var(--amber); color: #0d1117; border-radius: 20px; font-size: 0.68rem; font-weight: 700; padding: 1px 7px; min-width: 20px; text-align: center; }
+  .wishlist-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 300; align-items: flex-end; justify-content: center; }
+  .wishlist-overlay.show { display: flex; }
+  .wishlist-drawer { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; padding: 24px 20px 36px; width: 100%; max-width: 480px; max-height: 80vh; display: flex; flex-direction: column; }
+  .wishlist-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .wishlist-header h3 { font-size: 1rem; font-weight: 600; }
+  .wishlist-close { background: none; border: none; color: var(--text3); font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 2px 6px; }
+  .wishlist-subtext { font-size: 0.78rem; color: var(--text3); margin-bottom: 16px; }
+  .wishlist-input-row { display: flex; gap: 8px; margin-bottom: 14px; flex-shrink: 0; }
+  .wishlist-input-row input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; padding: 10px 14px; outline: none; }
+  .wishlist-input-row input:focus { border-color: var(--amber); }
+  .wishlist-input-row button { padding: 10px 16px; background: var(--amber); border: none; border-radius: var(--radius-sm); color: #0d1117; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+  .wishlist-items { overflow-y: auto; flex: 1; }
+  .wishlist-item { display: flex; align-items: center; gap: 10px; padding: 11px 14px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 6px; }
+  .wishlist-item-text { flex: 1; font-size: 0.88rem; }
+  .wishlist-item-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
+  .wishlist-item-del:hover { color: var(--red); }
+
+  /* ── SYMPTOMS ── */
+  .symptom-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+  .symptom-tag-btn { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface2); color: var(--text3); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.78rem; cursor: pointer; transition: all 0.15s; }
+  .symptom-tag-btn.selected { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+  .symptom-severity-row { display: flex; gap: 6px; }
+  .symptom-sev-btn { flex: 1; padding: 8px 4px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface2); color: var(--text3); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.78rem; font-weight: 500; cursor: pointer; text-align: center; transition: all 0.15s; }
+  .symptom-sev-btn.sel-mild   { border-color: #5ecfb1; background: rgba(94,207,177,0.15); color: #5ecfb1; }
+  .symptom-sev-btn.sel-moderate { border-color: #f0a847; background: rgba(240,168,71,0.15); color: #f0a847; }
+  .symptom-sev-btn.sel-severe { border-color: #e05c6a; background: rgba(224,92,106,0.15); color: #e05c6a; }
+  .symptom-entry { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 8px; }
+  .symptom-entry-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .symptom-entry-time { font-family: 'DM Mono', monospace; font-size: 0.78rem; color: var(--text3); }
+  .symptom-entry-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 0.9rem; }
+  .symptom-entry-del:hover { color: var(--red); }
+  .symptom-entry-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 5px; }
+  .symptom-tag-pill { font-size: 0.73rem; padding: 2px 9px; border-radius: 20px; background: var(--surface2); border: 1px solid var(--border); color: var(--text2); }
+  .symptom-sev-pill { font-size: 0.73rem; padding: 2px 9px; border-radius: 20px; font-weight: 500; }
+  .symptom-sev-pill.mild     { background: rgba(94,207,177,0.15); color: #5ecfb1; }
+  .symptom-sev-pill.moderate { background: rgba(240,168,71,0.15); color: #f0a847; }
+  .symptom-sev-pill.severe   { background: rgba(224,92,106,0.15); color: #e05c6a; }
+  .symptom-entry-note { font-size: 0.78rem; color: var(--text3); margin-top: 4px; font-style: italic; }
+  .symptom-day-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text3); margin: 12px 0 6px; font-weight: 600; }
+
+  /* ── APPOINTMENTS ── */
+  .appt-entry { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 8px; }
+  .appt-entry.upcoming { border-left: 3px solid var(--accent); }
+  .appt-entry.past-appt { opacity: 0.6; }
+  .appt-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px; }
+  .appt-title { font-size: 0.92rem; font-weight: 600; }
+  .appt-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 0.9rem; }
+  .appt-del:hover { color: var(--red); }
+  .appt-meta { font-size: 0.78rem; color: var(--text3); font-family: 'DM Mono', monospace; margin-bottom: 4px; }
+  .appt-meta span { color: var(--accent); }
+  .appt-notes { font-size: 0.78rem; color: var(--text3); font-style: italic; }
+  .appt-badge { font-size: 0.68rem; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+  .appt-badge.soon { background: var(--amber-dim); color: var(--amber); }
+  .appt-badge.today-badge { background: var(--accent-dim); color: var(--accent); }
+
+  /* ── GOALS ── */
+  .goal-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .goal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .goal-name { font-size: 0.92rem; font-weight: 600; }
+  .goal-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 0.85rem; }
+  .goal-del:hover { color: var(--red); }
+  .goal-progress-wrap { background: var(--surface2); border-radius: 4px; height: 6px; margin-bottom: 8px; overflow: hidden; }
+  .goal-progress-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+  .goal-meta { display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: var(--text3); }
+  .goal-current { font-family: 'DM Mono', monospace; font-size: 1rem; font-weight: 600; color: var(--accent); }
+
+  /* ── REST & PACING ── */
+  .pacing-day { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .pacing-btn { padding: 14px 8px; border-radius: var(--radius); border: 2px solid var(--border); background: var(--surface2); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.82rem; font-weight: 600; cursor: pointer; text-align: center; transition: all 0.15s; }
+  .pacing-btn .pacing-icon { font-size: 1.5rem; display: block; margin-bottom: 4px; }
+  .pacing-btn.green.active  { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+  .pacing-btn.amber.active  { border-color: var(--amber); background: var(--amber-dim); color: var(--amber); }
+  .pacing-btn.red.active    { border-color: var(--red); background: var(--red-dim); color: var(--red); }
+  .energy-row { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .energy-label { font-size: 0.78rem; color: var(--text3); flex-shrink: 0; min-width: 80px; }
+  .energy-slider { flex: 1; -webkit-appearance: none; height: 5px; border-radius: 3px; background: var(--surface2); outline: none; }
+  .energy-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); cursor: pointer; }
+  .energy-val { font-family: 'DM Mono', monospace; font-size: 0.85rem; color: var(--accent); min-width: 28px; text-align: right; }
+  .rest-entry { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface2); border-radius: var(--radius-sm); margin-bottom: 6px; }
+  .rest-entry-info { font-size: 0.85rem; }
+  .rest-entry-time { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--text3); }
+  .rest-entry-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 0.9rem; }
+
+  /* ── SETTINGS ── */
+  .settings-section { margin-bottom: 24px; }
+  .settings-section-title { font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text3); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .sched-med-config { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; }
+  .sched-med-config-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .sched-med-config-name { font-size: 0.92rem; font-weight: 600; }
+  .sched-med-config-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 0.85rem; }
+  .sched-med-config-del:hover { color: var(--red); }
+  .time-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .time-tag { display: flex; align-items: center; gap: 4px; padding: 4px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; font-family: 'DM Mono', monospace; font-size: 0.78rem; color: var(--text2); }
+  .time-tag-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 0.8rem; line-height: 1; padding: 0 2px; }
+  .time-tag-del:hover { color: var(--red); }
+  .add-time-row { display: flex; gap: 6px; align-items: center; }
+  .add-time-row input[type="time"] { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.85rem; padding: 7px 10px; outline: none; }
+  .add-time-row input:focus { border-color: var(--accent); }
+  .add-time-row button { padding: 7px 14px; background: var(--accent-dim); border: 1px solid var(--accent); border-radius: var(--radius-sm); color: var(--accent); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.8rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .prn-toggle-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 0.78rem; color: var(--text2); }
+  .toggle-switch { position: relative; width: 36px; height: 20px; display: inline-block; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--surface3); border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+  .toggle-slider:before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: var(--text3); border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+  .toggle-switch input:checked + .toggle-slider { background: var(--accent-dim); }
+  .toggle-switch input:checked + .toggle-slider:before { transform: translateX(16px); background: var(--accent); }
+  .firebase-config-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 10px; }
+  .firebase-config-card p { font-size: 0.78rem; color: var(--text3); margin-bottom: 12px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <p>Loading your tracker…</p>
+</div>
+
+<header>
+  <h1>🏠 Home Recovery</h1>
+  <span class="sync-badge"><span class="sync-dot" id="sync-dot"></span><span id="sync-label">Connecting…</span></span>
+  <div class="date-nav">
+    <button class="date-nav-btn" onclick="stepDate(-1)">‹</button>
+    <div class="date-display" onclick="document.getElementById('date-picker').showPicker?.()??document.getElementById('date-picker').click()">
+      <span class="date-display-label" id="date-display-label">Today</span>
+      <span class="date-display-sub" id="date-display-sub"></span>
+    </div>
+    <input type="date" id="date-picker" class="date-picker-input" onchange="onDatePick()">
+    <button class="date-nav-btn" id="next-day-btn" onclick="stepDate(1)" disabled>›</button>
+  </div>
+  <div class="past-mode-banner" id="past-banner">📅 Viewing past date — read only</div>
+</header>
+
+<div class="tabs" id="main-tabs">
+  <button class="tab-btn active" data-tab="overview"  onclick="switchTab(this)">Home</button>
+  <button class="tab-btn"        data-tab="meds"      onclick="switchTab(this)">Meds</button>
+  <button class="tab-btn"        data-tab="pain"      onclick="switchTab(this)">Pain</button>
+  <button class="tab-btn"        data-tab="symptoms"  onclick="switchTab(this)">Sympts</button>
+  <button class="tab-btn"        data-tab="pacing"    onclick="switchTab(this)">Pace</button>
+  <button class="tab-btn"        data-tab="food"      onclick="switchTab(this)">Food</button>
+  <button class="tab-btn"        data-tab="walk"      onclick="switchTab(this)">Walk</button>
+  <button class="tab-btn"        data-tab="weight"    onclick="switchTab(this)">Weight</button>
+  <button class="tab-btn"        data-tab="appts"     onclick="switchTab(this)">Appts</button>
+  <button class="tab-btn"        data-tab="goals"     onclick="switchTab(this)">Goals</button>
+  <button class="tab-btn"        data-tab="settings"  onclick="switchTab(this)">Config</button>
+</div>
+
+<!-- OVERVIEW -->
+<div id="tab-overview" class="tab-pane active">
+  <p class="section-title" id="overview-date-label">Today at a glance</p>
+
+  <!-- Stats row -->
+  <div class="stat-grid-3" id="overview-stats"></div>
+
+  <!-- Next med due -->
+  <div id="overview-next-med" style="margin-bottom:16px"></div>
+
+  <!-- Quick log buttons -->
+  <div id="overview-quick-log" style="margin-bottom:16px"></div>
+
+  <!-- Today's schedule summary -->
+  <div id="overview-schedule" style="margin-bottom:16px"></div>
+
+  <!-- Pain trend -->
+  <div id="overview-pain-trend" style="margin-bottom:16px"></div>
+
+  <!-- Upcoming appointments -->
+  <div id="overview-appts" style="margin-bottom:16px"></div>
+
+  <!-- Goals -->
+  <div id="overview-goals" style="margin-bottom:16px"></div>
+</div>
+
+<!-- MEDICATIONS -->
+<div id="tab-meds" class="tab-pane">
+  <!-- SCHEDULED -->
+  <div class="schedule-section">
+    <div class="med-section-header">📅 Scheduled medications</div>
+    <div id="missed-doses-section"></div>
+    <div id="due-soon-section"></div>
+    <div id="schedule-list"></div>
+    <div id="add-sched-med-section">
+      <div class="add-med-card">
+        <p class="section-title">＋ Add scheduled medication</p>
+        <label class="field-label">Name</label>
+        <input type="text" class="form-input" id="sched-new-name" placeholder="e.g. Paracetamol">
+        <label class="field-label">Scheduled times</label>
+        <div class="add-time-row" style="margin-bottom:8px">
+          <input type="time" id="sched-new-time">
+          <button onclick="addSchedNewTime()">Add time</button>
+        </div>
+        <div class="time-tags" id="sched-new-times"></div>
+        <label class="field-label" style="margin-top:6px">Hours between doses (for PRN timer)</label>
+        <input type="number" class="form-input" id="sched-new-hours" placeholder="e.g. 4" min="0" step="1">
+        <label class="field-label">Strengths (optional, comma-separated)</label>
+        <input type="text" class="form-input" id="sched-new-strengths" placeholder="e.g. 2.5mg, 5mg, 10mg">
+        <div class="prn-toggle-row">
+          <span>Also track as PRN (shared timer)</span>
+          <label class="toggle-switch"><input type="checkbox" id="sched-new-prn-toggle"><span class="toggle-slider"></span></label>
+        </div>
+        <button class="add-med-btn" style="margin-top:12px" onclick="addSchedMed()">Add medication</button>
+      </div>
+    </div>
+  </div>
+  <!-- PRN -->
+  <div>
+    <div class="med-section-header" style="display:flex;align-items:center;justify-content:space-between">
+      <span>⚡ PRN (as needed)</span>
+      <button onclick="openReorder()" style="background:none;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text3);font-family:'Plus Jakarta Sans',sans-serif;font-size:0.72rem;padding:3px 10px;cursor:pointer">⇅ Reorder</button>
+    </div>
+    
+    <div id="med-list"></div>
+    <div id="add-med-section">
+      <div class="add-med-card">
+        <p class="section-title">＋ Add PRN medication</p>
+        <label class="field-label">Name</label>
+        <input type="text" class="form-input" id="new-med-name" placeholder="e.g. Ondansetron">
+        <label class="field-label">Hours between doses</label>
+        <input type="number" class="form-input" id="new-med-hours" placeholder="e.g. 8" min="0" step="1">
+        <label class="field-label">Strengths (optional, comma-separated)</label>
+        <input type="text" class="form-input" id="new-med-strengths" placeholder="e.g. 2.5mg, 5mg, 10mg">
+        <button class="add-med-btn" onclick="addPRNMed()">Add medication</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- PAIN -->
+<div id="tab-pain" class="tab-pane">
+  <div class="pain-subtabs">
+    <button class="pain-subtab active" data-sub="today"   onclick="switchPainSub(this)">This day</button>
+    <button class="pain-subtab"        data-sub="compare" onclick="switchPainSub(this)">Compare</button>
+    <button class="pain-subtab"        data-sub="log"     onclick="switchPainSub(this)">Log</button>
+  </div>
+  <div class="pain-subpane active" id="pain-sub-today">
+    <div class="stat-grid-3">
+      <div class="stat-box"><div class="stat-val" id="ps-avg" style="color:var(--amber)">—</div><div class="stat-label">Avg</div></div>
+      <div class="stat-box"><div class="stat-val" id="ps-low" style="color:var(--accent)">—</div><div class="stat-label">Lowest</div></div>
+      <div class="stat-box"><div class="stat-val" id="ps-high" style="color:var(--red)">—</div><div class="stat-label">Highest</div></div>
+    </div>
+    <div class="card" id="pain-today-chart-card" style="display:none"><div class="section-title" id="pain-chart-title">Pain today</div><div class="graph-wrap"><canvas id="pain-today-chart"></canvas></div></div>
+    <p class="section-title" id="pain-slots-title">Hourly slots</p>
+    <div id="pain-slots"></div>
+  </div>
+  <div class="pain-subpane" id="pain-sub-compare">
+    <div class="card"><div class="section-title">Daily average pain</div><div class="graph-wrap"><canvas id="pain-avg-chart"></canvas></div></div>
+    <div class="card">
+      <div class="section-title">Compare days</div>
+      <p style="font-size:0.75rem;color:var(--text3);margin-bottom:10px">Tap days to overlay on one chart</p>
+      <div class="day-toggles" id="day-toggles"></div>
+      <div class="graph-wrap" style="height:200px"><canvas id="pain-compare-chart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-title">Day detail</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <select id="drilldown-select" class="form-input" style="margin-bottom:0;flex:1"></select>
+        <button class="add-med-btn" style="flex-shrink:0;width:auto;padding:9px 14px" onclick="renderDrilldown()">View</button>
+      </div>
+      <div id="drilldown-content"><p class="empty-state" style="padding:20px">Select a day above</p></div>
+    </div>
+  </div>
+  <div class="pain-subpane" id="pain-sub-log">
+    <div id="pain-log-form">
+      <div class="card">
+        <div class="section-title" id="pain-quick-title">Log pain now</div>
+        <p style="font-size:0.75rem;color:var(--text3);margin-bottom:12px">Top row: whole numbers. Bottom row: halves. 1 = no pain, 10 = worst.</p>
+        <div id="pain-score-grid"></div>
+        <div class="pain-scale-label"><span>No pain</span><span>Worst</span></div>
+        <input type="text" class="pain-comment-input" id="pain-comment" placeholder="Optional comment (e.g. sharp, dull, nausea)">
+        <button class="pain-log-btn" id="pain-log-btn" onclick="logPainNow()" disabled>Select a score above to log</button>
+      </div>
+      <div class="add-med-card">
+        <div class="section-title">＋ Add extra / backdated check-in</div>
+        <label class="field-label">Time</label>
+        <input type="time" id="pain-extra-time" class="form-input">
+        <label class="field-label">Pain score</label>
+        <div id="pain-extra-score-grid"></div>
+        <div class="pain-scale-label"><span>No pain</span><span>Worst</span></div>
+        <label class="field-label">Comment (optional)</label>
+        <input type="text" id="pain-extra-comment" class="form-input" placeholder="e.g. after physio, woke in pain">
+        <button class="add-med-btn" onclick="logPainExtra()">Add check-in</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REST & PACING -->
+<div id="tab-pacing" class="tab-pane">
+  <p class="section-title" id="pacing-title">Rest & Pacing</p>
+  <div class="card">
+    <p class="section-title" style="margin-bottom:10px">Today's day type</p>
+    <div class="pacing-day">
+      <button class="pacing-btn green" id="pacing-green" onclick="setPacingDay('green')"><span class="pacing-icon">🟢</span>Green Day<br><span style="font-size:0.68rem;font-weight:400;color:var(--text3)">Feeling good</span></button>
+      <button class="pacing-btn amber" id="pacing-amber" onclick="setPacingDay('amber')"><span class="pacing-icon">🟡</span>Amber Day<br><span style="font-size:0.68rem;font-weight:400;color:var(--text3)">Take it easy</span></button>
+      <button class="pacing-btn red"   id="pacing-rest"  onclick="setPacingDay('rest')"><span class="pacing-icon">🔴</span>Rest Day<br><span style="font-size:0.68rem;font-weight:400;color:var(--text3)">Rest &amp; recover</span></button>
+    </div>
+    <div id="pacing-guidance" style="font-size:0.82rem;color:var(--text3);padding:10px;background:var(--surface2);border-radius:var(--radius-sm);min-height:40px"></div>
+  </div>
+  <div class="card" id="energy-checkin-card">
+    <p class="section-title">Energy check-in</p>
+    <div class="energy-row">
+      <span class="energy-label">Energy</span>
+      <input type="range" class="energy-slider" id="energy-slider" min="1" max="10" value="5" oninput="document.getElementById('energy-val').textContent=this.value">
+      <span class="energy-val" id="energy-val">5</span>
+    </div>
+    <div class="energy-row">
+      <span class="energy-label">Mood</span>
+      <input type="range" class="energy-slider" id="mood-slider" min="1" max="10" value="5" oninput="document.getElementById('mood-val').textContent=this.value">
+      <span class="energy-val" id="mood-val">5</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px" id="energy-log-section">
+      <button class="add-med-btn" onclick="logEnergyCheckin()">Save check-in</button>
+    </div>
+    <div id="energy-today" style="margin-top:12px"></div>
+  </div>
+  <div class="card">
+    <p class="section-title">Log a rest period</p>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <input type="time" id="rest-start" class="form-input" style="flex:1;margin-bottom:0">
+      <span style="color:var(--text3);font-size:0.8rem;flex-shrink:0">to</span>
+      <input type="time" id="rest-end" class="form-input" style="flex:1;margin-bottom:0">
+    </div>
+    <button class="add-med-btn" onclick="logRest()">Log rest</button>
+  </div>
+  <p class="section-title" id="rest-log-title">Rest log today</p>
+  <div id="rest-list"></div>
+  <div class="card" id="pacing-history-card" style="margin-top:8px;display:none">
+    <p class="section-title">14-day energy history</p>
+    <div class="graph-wrap"><canvas id="pacing-chart"></canvas></div>
+  </div>
+</div>
+
+<!-- FOOD -->
+<div id="tab-food" class="tab-pane">
+  <p class="section-title" id="food-title">Today's food & drink log</p>
+  <div id="food-log-inputs">
+    <div class="food-input-row">
+      <input type="text" id="food-input" placeholder="e.g. toast with butter, tea…" onkeydown="if(event.key==='Enter')addFood()">
+      <button onclick="addFood()">Add</button>
+    </div>
+  </div>
+  <div id="food-list"></div>
+  <button class="wishlist-btn" onclick="openWishlist()">
+    🍽️ Food ideas & wishlist <span class="wishlist-count" id="wishlist-count">0</span>
+  </button>
+</div>
+
+<!-- MOVEMENT -->
+<!-- WALK -->
+<div id="tab-walk" class="tab-pane">
+  <div class="walk-progress">
+    <div>
+      <div class="walk-progress-label" id="walk-label">Walks completed today</div>
+      <div class="progress-bar-wrap" style="width:200px"><div class="progress-bar-fill" id="walk-bar" style="width:0%"></div></div>
+    </div>
+    <span class="walk-progress-count" id="walk-count">0 / 13</span>
+  </div>
+  <p class="section-title" id="walk-title">Hourly walks — 9:30am to 9:30pm</p>
+  <div class="walk-grid" id="walk-grid"></div>
+</div>
+
+<!-- WEIGHT -->
+<div id="tab-weight" class="tab-pane">
+  <p class="section-title">Weight</p>
+  <div class="stat-grid-3" style="margin-bottom:12px">
+    <div class="stat-box"><div class="stat-val" id="ws-current">—</div><div class="stat-label">Current</div></div>
+    <div class="stat-box"><div class="stat-val" id="ws-highest" style="color:var(--red)">—</div><div class="stat-label">Highest</div></div>
+    <div class="stat-box"><div class="stat-val" id="ws-lost" style="color:var(--amber)">—</div><div class="stat-label">Change</div></div>
+  </div>
+  <div id="weight-log-section">
+    <div class="card">
+      <p class="section-title">Log weight</p>
+      <div class="weight-row">
+        <input type="number" id="weight-input" placeholder="kg" step="0.1" min="20" max="300">
+        <button onclick="logWeight(false)">Save today</button>
+      </div>
+      <button class="past-toggle" onclick="document.getElementById('past-weight-section').classList.toggle('show')">Add a past date instead</button>
+      <div class="past-section" id="past-weight-section">
+        <label class="field-label" style="margin-top:10px">Select a date</label>
+        <div class="weight-row"><input type="date" id="weight-past-date"><button onclick="logWeight(true)">Save date</button></div>
+        <p style="font-size:0.72rem;color:var(--text3)">Uses the weight entered above.</p>
+      </div>
+    </div>
+  </div>
+  <div id="weight-day-section"></div>
+  <div class="card" id="weight-graph-card" style="display:none"><div class="section-title">Trend (all time)</div><div class="graph-wrap"><canvas id="weight-chart"></canvas></div></div>
+  <div id="weight-history-list"></div>
+</div>
+
+<!-- APPOINTMENTS -->
+<div id="tab-appts" class="tab-pane">
+  <p class="section-title">Upcoming appointments</p>
+  <div id="upcoming-appts"></div>
+  <div class="add-med-card">
+    <p class="section-title">＋ Add appointment</p>
+    <label class="field-label">Title</label>
+    <input type="text" class="form-input" id="appt-title" placeholder="e.g. GP follow-up, physio">
+    <label class="field-label">Date</label>
+    <input type="date" class="form-input" id="appt-date">
+    <label class="field-label">Time (optional)</label>
+    <input type="time" class="form-input" id="appt-time">
+    <label class="field-label">Location (optional)</label>
+    <input type="text" class="form-input" id="appt-location" placeholder="e.g. Royal Victoria">
+    <label class="field-label">Notes (optional)</label>
+    <textarea class="form-input" id="appt-notes" rows="3" placeholder="e.g. bring med list, ask about…" style="resize:vertical"></textarea>
+    <button class="add-med-btn" onclick="addAppt()">Add appointment</button>
+  </div>
+  <p class="section-title" style="margin-top:8px">Past appointments</p>
+  <div id="past-appts"></div>
+</div>
+
+<!-- EDIT APPOINTMENT OVERLAY -->
+<div class="med-hist-overlay" id="edit-appt-overlay" onclick="if(event.target===this)closeEditAppt()">
+  <div class="med-hist-drawer">
+    <div class="med-hist-header">
+      <h3>Edit appointment</h3>
+      <button class="med-hist-close" onclick="closeEditAppt()">×</button>
+    </div>
+    <div style="overflow-y:auto;flex:1">
+      <label class="field-label">Title</label>
+      <input type="text" class="form-input" id="edit-appt-title">
+      <label class="field-label">Date</label>
+      <input type="date" class="form-input" id="edit-appt-date">
+      <label class="field-label">Time (optional)</label>
+      <input type="time" class="form-input" id="edit-appt-time">
+      <label class="field-label">Location (optional)</label>
+      <input type="text" class="form-input" id="edit-appt-location">
+      <label class="field-label">Notes</label>
+      <textarea class="form-input" id="edit-appt-notes" rows="5" style="resize:vertical"></textarea>
+      <button class="add-med-btn" style="margin-top:8px" onclick="saveEditAppt()">Save changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- REORDER PRN OVERLAY -->
+<div class="med-hist-overlay" id="reorder-overlay" onclick="if(event.target===this)closeReorder()">
+  <div class="med-hist-drawer">
+    <div class="med-hist-header">
+      <h3>Reorder medications</h3>
+      <button class="med-hist-close" onclick="closeReorder()">×</button>
+    </div>
+    <p style="font-size:0.78rem;color:var(--text3);margin-bottom:14px">Drag to reorder, or use the arrows.</p>
+    <div id="reorder-list" style="overflow-y:auto;flex:1"></div>
+    <button class="add-med-btn" style="margin-top:14px;flex-shrink:0" onclick="saveReorder()">Save order</button>
+  </div>
+</div>
+
+<!-- GOALS -->
+<div id="tab-goals" class="tab-pane">
+  <p class="section-title">Recovery goals</p>
+  <div id="goals-list"></div>
+  <div class="add-med-card">
+    <p class="section-title">＋ Add goal</p>
+    <label class="field-label">Goal name</label>
+    <input type="text" class="form-input" id="goal-name" placeholder="e.g. Walk 5 times a day">
+    <label class="field-label">Type</label>
+    <select class="form-input" id="goal-type">
+      <option value="daily-walks">Daily walks</option>
+      <option value="weight-target">Weight target (kg)</option>
+      <option value="pain-below">Keep pain below score</option>
+      <option value="custom">Custom (manual progress)</option>
+    </select>
+    <label class="field-label">Target value</label>
+    <input type="number" class="form-input" id="goal-target" placeholder="e.g. 5">
+    <label class="field-label">Notes (optional)</label>
+    <input type="text" class="form-input" id="goal-notes" placeholder="e.g. build up slowly">
+    <button class="add-med-btn" onclick="addGoal()">Add goal</button>
+  </div>
+</div>
+
+<!-- SYMPTOMS -->
+<div id="tab-symptoms" class="tab-pane">
+  <p class="section-title" id="symptoms-title">Today's symptoms</p>
+  <div class="card" id="symptoms-log-section">
+    <p class="section-title">Log a symptom</p>
+    <label class="field-label">Quick tags</label>
+    <div class="symptom-tags" id="symptom-tag-btns"></div>
+    <label class="field-label" style="margin-top:10px">Notes (optional)</label>
+    <input type="text" id="symptom-note" class="form-input" placeholder="e.g. came on suddenly, worse after eating…">
+    <label class="field-label">Severity</label>
+    <div class="symptom-severity-row" id="symptom-severity-btns"></div>
+    <button class="add-med-btn" style="margin-top:10px" onclick="logSymptom()">Log symptom</button>
+  </div>
+  <p class="section-title" id="symptoms-list-title">Entries</p>
+  <div id="symptoms-list"></div>
+</div>
+
+<!-- SETTINGS -->
+<div id="tab-settings" class="tab-pane">
+  <!-- Scheduled medications -->
+  <div class="settings-section">
+    <div class="settings-section-title">Scheduled medications</div>
+    <p style="font-size:0.78rem;color:var(--text3);margin-bottom:12px">Add and remove scheduled medications from the Meds tab. Edit times and settings here.</p>
+    <div id="sched-med-config-list"></div>
+  </div>
+
+  <!-- PRN medications in settings (view only, managed via med tab) -->
+  <div class="settings-section">
+    <div class="settings-section-title">PRN medications</div>
+    <p style="font-size:0.78rem;color:var(--text3);margin-bottom:12px">PRN medications are added and removed from the Medications tab.</p>
+    <div id="settings-prn-list"></div>
+  </div>
+
+  <!-- Goals -->
+  <div class="settings-section">
+    <div class="settings-section-title">Symptom tags</div>
+    <p style="font-size:0.78rem;color:var(--text3);margin-bottom:10px">Custom tags shown in the Symptoms tab.</p>
+    <div class="time-tags" id="custom-tag-list"></div>
+    <div class="add-time-row" style="margin-top:8px">
+      <input type="text" class="form-input" id="new-tag-input" placeholder="e.g. Joint pain" style="margin-bottom:0">
+      <button onclick="addCustomTag()" style="padding:7px 14px;background:var(--accent-dim);border:1px solid var(--accent);border-radius:var(--radius-sm);color:var(--accent);font-family:'Plus Jakarta Sans',sans-serif;font-size:0.8rem;font-weight:600;cursor:pointer;white-space:nowrap">Add tag</button>
+    </div>
+  </div>
+
+  <!-- Dark mode -->
+  <div class="settings-section">
+    <div class="settings-section-title">Appearance</div>
+    <div class="prn-toggle-row">
+      <span>Dark mode</span>
+      <label class="toggle-switch"><input type="checkbox" id="dark-mode-toggle" onchange="toggleDarkMode(this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+  </div>
+
+  <!-- Weekly summary -->
+  <div class="settings-section">
+    <div class="settings-section-title">Weekly summary</div>
+    <div id="weekly-summary-content"></div>
+    <button class="add-med-btn" style="margin-top:8px" onclick="renderWeeklySummary()">Generate summary</button>
+  </div>
+
+  <!-- Export -->
+  <div class="settings-section">
+    <div class="settings-section-title">Export data</div>
+    <p style="font-size:0.78rem;color:var(--text3);margin-bottom:10px">Download your data as a CSV file to share with your doctor.</p>
+    <button class="add-med-btn" onclick="exportData()">Export to CSV</button>
+  </div>
+</div>
+
+<!-- MED HISTORY DRAWER -->
+<div class="med-hist-overlay" id="med-hist-overlay" onclick="if(event.target===this) closeMedHist()">
+  <div class="med-hist-drawer">
+    <div class="med-hist-header">
+      <h3 id="med-hist-title">Dose history</h3>
+      <button class="med-hist-close" onclick="closeMedHist()">×</button>
+    </div>
+    <div class="med-hist-content" id="med-hist-content"></div>
+  </div>
+</div>
+
+<!-- WISHLIST DRAWER -->
+<div class="wishlist-overlay" id="wishlist-overlay" onclick="if(event.target===this) closeWishlist()">
+  <div class="wishlist-drawer">
+    <div class="wishlist-header"><h3>🍽️ Food ideas & wishlist</h3><button class="wishlist-close" onclick="closeWishlist()">×</button></div>
+    <p class="wishlist-subtext">Jot down anything that sounds appealing!</p>
+    <div class="wishlist-input-row">
+      <input type="text" id="wishlist-input" placeholder="e.g. soup, yoghurt, toast…" onkeydown="if(event.key==='Enter')addWishlistItem()">
+      <button onclick="addWishlistItem()">Add</button>
+    </div>
+    <div class="wishlist-items" id="wishlist-items"></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3 id="modal-title">Confirm</h3>
+    <p id="modal-body"></p>
+    <div id="modal-extra"></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-confirm" id="modal-ok" onclick="confirmAction()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDA_PLy1m9R1zEW3UKABnSRZMAcPyMhDTE",
+  authDomain: "home-2c69b.firebaseapp.com",
+  projectId: "home-2c69b",
+  storageBucket: "home-2c69b.firebasestorage.app",
+  messagingSenderId: "593495254176",
+  appId: "1:593495254176:web:3f3373aa15ce5cd945d5c5"
+};
+
+const app = initializeApp(FIREBASE_CONFIG);
+const db  = getFirestore(app);
+
+const DATA_REF     = doc(db,'recovery','data');
+const CONFIG_REF   = doc(db,'recovery','config');
+const WEIGHT_REF   = doc(db,'recovery','weight');
+const PAIN_REF     = doc(db,'recovery','pain');
+const WISHLIST_REF = doc(db,'recovery','wishlist');
+const APPT_REF     = doc(db,'recovery','appointments');
+const GOALS_REF    = doc(db,'recovery','goals');
+const PACING_REF   = doc(db,'recovery','pacing');
+const SYMPTOM_REF  = doc(db,'recovery','symptoms');
+
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const WALK_TIMES  = ['09:30','10:30','11:30','12:30','13:30','14:30','15:30','16:30','17:30','18:30','19:30','20:30','21:30'];
+const PAIN_HOURS  = Array.from({length:24},(_,i)=>String(i).padStart(2,'0')+':00');
+const DAY_COLORS  = ['#5ecfb1','#7b9ef0','#f0a847','#c084fc','#e05c6a','#5bc0de','#f4a261','#a8dadc'];
+const WHOLE_SCORES= [1,2,3,4,5,6,7,8,9,10];
+const HALF_SCORES = [1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5];
+const OXY_MAX     = 40;
+const TOPUP_AFTER_HOURS = 1;
+
+const DEFAULT_SYMPTOM_TAGS = ['Nausea','Vomiting','Dizziness','Headache','Fatigue','Stomach pain','Cramping','Bloating','Diarrhoea','Constipation','Loss of appetite','Fever','Chills','Sweating','Shortness of breath','Muscle ache','Back pain','Anxiety','Insomnia','Other'];
+const PACING_GUIDANCE = {
+  green: '🟢 Green Day — You\'re feeling well. Gentle activity is fine. Stick to your plan, don\'t overdo it just because you feel good.',
+  amber: '🟡 Amber Day — Take it steady. Prioritise essential tasks, keep activity low, and rest when needed.',
+  rest:  '🔴 Rest Day — Your body needs recovery time. Rest as much as possible, keep interactions minimal, gentle movement only if comfortable.'
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let state={}, prnMeds=[], schedMeds=[], weightLog={}, painLog={}, wishlist=[];
+let appointments=[], goals=[], pacingLog={}, symptomLog={};
+let selStr={}, pendingAction=null;
+let selPainScore=null, selExtraScore=null, activeDays=new Set();
+let wChart=null, painTodayChart=null, painAvgChart=null, painCmpChart=null, pacingChart=null;
+let selectedSymptomTags=new Set(), selectedSeverity=null;
+let customSymptomTags=[];
+let schedNewTimes=[];
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+const pad = n => String(n).padStart(2,'0');
+const todayKey = () => { const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
+const yesterdayKey = () => { const d=new Date(); d.setDate(d.getDate()-1); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); };
+const fmt = ts => ts ? new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+const fmtKey = k => { if(!k) return ''; const [y,m,d]=k.split('-').map(Number),date=new Date(y,m-1,d); const today=new Date(); today.setHours(0,0,0,0); const yest=new Date(today); yest.setDate(today.getDate()-1); date.setHours(0,0,0,0); if(date.getTime()===today.getTime()) return 'Today'; if(date.getTime()===yest.getTime()) return 'Yesterday'; return date.toLocaleDateString([],{weekday:'short',day:'numeric',month:'short'}); };
+const fmtKeyLong = k => { if(!k) return ''; const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString([],{weekday:'long',day:'numeric',month:'long',year:'numeric'}); };
+const fmtDateShort = k => { const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString([],{day:'numeric',month:'short'}); };
+const cdown = (ts,h) => { if(!ts) return null; const diff=(ts+h*3600000)-Date.now(); if(diff<=0) return 'Ready'; return pad(Math.floor(diff/3600000))+':'+pad(Math.floor((diff%3600000)/60000))+':'+pad(Math.floor((diff%60000)/1000)); };
+const nextAvailTime = (ts,h) => { if(!ts) return null; return new Date(ts+h*3600000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); };
+const getDay = k => { if(!state[k]) state[k]={meds:{},food:[],walks:{},rest:[]}; return state[k]; };
+const getPainDay = k => { if(!painLog[k]) painLog[k]=[]; return painLog[k]; };
+const getPacingDay = k => pacingLog[k]||{};
+const painColor = n => n<=3?'#5ecfb1':n<=6?'#f0a847':n<=8?'#e08c50':'#e05c6a';
+const selClass  = v => v<=3?'sel-low':v<=6?'sel-mid':v<=8?'sel-high':'sel-max';
+const dayAvg    = es => (!es||!es.length)?null:es.reduce((a,b)=>a+b.score,0)/es.length;
+const fmtScore  = v => Number.isInteger(v)?String(v):v.toFixed(1);
+
+let viewKey = todayKey();
+const isToday = () => viewKey === todayKey();
+
+// ── SYNC HELPERS ──────────────────────────────────────────────────────────────
+const setSync = s => { const dot=document.getElementById('sync-dot'),lbl=document.getElementById('sync-label'); dot.className='sync-dot'+(s==='ok'?' ok':s==='err'?' err':''); lbl.textContent=s==='ok'?'Synced':s==='err'?'Sync error':'Syncing…'; };
+const saveData    = async () => { try{await setDoc(DATA_REF,state);setSync('ok');}catch{setSync('err');} };
+const saveCfg     = async () => { try{await setDoc(CONFIG_REF,{schedMeds,prnMeds,customSymptomTags});setSync('ok');}catch{setSync('err');} };
+const saveWeight  = async () => { try{await setDoc(WEIGHT_REF,weightLog);setSync('ok');}catch{setSync('err');} };
+const savePain    = async () => { try{await setDoc(PAIN_REF,painLog);setSync('ok');}catch{setSync('err');} };
+const saveWishlist= async () => { try{await setDoc(WISHLIST_REF,{items:wishlist});setSync('ok');}catch{setSync('err');} };
+const saveAppts   = async () => { try{await setDoc(APPT_REF,{items:appointments});setSync('ok');}catch{setSync('err');} };
+const saveGoals   = async () => { try{await setDoc(GOALS_REF,{items:goals});setSync('ok');}catch{setSync('err');} };
+const savePacing  = async () => { try{await setDoc(PACING_REF,pacingLog);setSync('ok');}catch{setSync('err');} };
+const saveSymptoms= async () => { try{await setDoc(SYMPTOM_REF,symptomLog);setSync('ok');}catch{setSync('err');} };
+
+// ── OVERNIGHT CARRYOVER (PRN) ─────────────────────────────────────────────────
+function getCarriedRecord(medId, hours) {
+  const todayRec = (state[todayKey()]||{}).meds?.[medId];
+  if(todayRec) return { rec: todayRec, carried: false };
+  const yesterdayRec = (state[yesterdayKey()]||{}).meds?.[medId];
+  if(!yesterdayRec) return { rec: null, carried: false };
+  const timerTs = yesterdayRec.topupTs || yesterdayRec.ts;
+  const expiry  = timerTs + hours * 3600000;
+  if(Date.now() < expiry) return { rec: yesterdayRec, carried: true };
+  return { rec: null, carried: false };
+}
+
+// ── DATE NAV ──────────────────────────────────────────────────────────────────
+function updateDateHeader() {
+  const today = todayKey();
+  document.getElementById('date-display-label').textContent = fmtKey(viewKey);
+  document.getElementById('date-display-sub').textContent   = viewKey===today ? '' : fmtKeyLong(viewKey);
+  document.getElementById('next-day-btn').disabled          = viewKey >= today;
+  document.getElementById('date-picker').value              = viewKey;
+  document.getElementById('past-banner').className          = 'past-mode-banner'+(isToday()?'':' show');
+  document.getElementById('add-med-section').style.display  = isToday()?'':'none';
+  document.getElementById('add-sched-med-section').style.display = isToday()?'':'none';
+  document.getElementById('food-log-inputs').style.display  = isToday()?'':'none';
+  document.getElementById('weight-log-section').style.display = isToday()?'':'none';
+  document.getElementById('pain-log-form').style.display    = isToday()?'':'none';
+  document.getElementById('energy-log-section').style.display = isToday()?'':'none';
+}
+window.stepDate = delta => { const [y,m,d]=viewKey.split('-').map(Number),date=new Date(y,m-1,d); date.setDate(date.getDate()+delta); const nk=date.getFullYear()+'-'+pad(date.getMonth()+1)+'-'+pad(date.getDate()); if(nk>todayKey()) return; viewKey=nk; refreshAll(); };
+window.onDatePick = () => { const val=document.getElementById('date-picker').value; if(!val||val>todayKey()) return; viewKey=val; refreshAll(); };
+
+function refreshAll() {
+  updateDateHeader();
+  renderSchedule(); renderPRNMeds(); renderWalks(); renderWeight();
+  renderPainDay(); renderFood(); renderPacing(); renderOverview();
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function openModal(title,body,onConfirm,danger=false,extraHtml='') {
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-body').textContent=body;
+  document.getElementById('modal-extra').innerHTML=extraHtml;
+  document.getElementById('modal-ok').className='modal-confirm'+(danger?' danger':'');
+  pendingAction=onConfirm;
+  document.getElementById('modal').classList.add('show');
+}
+window.closeModal  = () => { document.getElementById('modal').classList.remove('show'); pendingAction=null; };
+window.confirmAction = () => { if(pendingAction){pendingAction();} closeModal(); };
+
+// ── SCORE GRID ────────────────────────────────────────────────────────────────
+function buildScoreGrid(containerId, getVal, setVal) {
+  const c = document.getElementById(containerId); if(!c) return; c.innerHTML='';
+  const r1=document.createElement('div'); r1.className='score-row';
+  WHOLE_SCORES.forEach(v=>{const b=document.createElement('button');b.className='score-btn'+(getVal()===v?' '+selClass(v):'');b.textContent=v;b.onclick=()=>{setVal(v);buildScoreGrid(containerId,getVal,setVal);updatePainLogBtn();};r1.appendChild(b);});
+  c.appendChild(r1);
+  const r2=document.createElement('div'); r2.className='score-row';
+  HALF_SCORES.forEach(v=>{const b=document.createElement('button');b.className='score-btn half'+(getVal()===v?' '+selClass(v):'');b.textContent=v;b.onclick=()=>{setVal(v);buildScoreGrid(containerId,getVal,setVal);updatePainLogBtn();};r2.appendChild(b);});
+  c.appendChild(r2);
+}
+function buildModalScoreGrid(containerId,getVal,setVal) { buildScoreGrid(containerId,getVal,setVal); }
+function updatePainLogBtn() {
+  const btn=document.getElementById('pain-log-btn');if(!btn)return;
+  btn.disabled=selPainScore==null;btn.textContent=selPainScore==null?'Select a score above to log':'Log pain now';
+}
+
+// ── OXY COUNTER ───────────────────────────────────────────────────────────────
+function parseOxyMg(s) { if(!s) return 0; const m=s.match(/([0-9.]+)/); return m?parseFloat(m[1]):0; }
+function getOxyLast24h(oxyId) {
+  const cutoff=Date.now()-24*3600000; let total=0;
+  [todayKey(),yesterdayKey()].forEach(k=>{ const r=(state[k]||{}).meds?.[oxyId]; if(!r) return; if(r.doses&&r.doses.length) r.doses.forEach(d=>{if(d.ts>=cutoff)total+=parseOxyMg(d.strength);}); else if(r.ts>=cutoff&&r.strength) total+=parseOxyMg(r.strength); });
+  return total;
+}
+function getNextOxyExpiry(oxyId) {
+  const cutoff=Date.now()-24*3600000; const ts=[];
+  [todayKey(),yesterdayKey()].forEach(k=>{ const r=(state[k]||{}).meds?.[oxyId]; if(!r) return; if(r.doses&&r.doses.length) r.doses.forEach(d=>{if(d.ts>=cutoff)ts.push(d.ts);}); else if(r.ts>=cutoff) ts.push(r.ts); });
+  return ts.length?Math.min(...ts)+24*3600000:null;
+}
+function renderOxyCounter() {
+  const container=document.getElementById('prn-oxy-counter'); container.innerHTML='';
+  const oxyMed=prnMeds.find(m=>m.name.toLowerCase().includes('oxycodone'));
+  if(!oxyMed||!isToday()) return;
+  const total=getOxyLast24h(oxyMed.id), expiry=getNextOxyExpiry(oxyMed.id);
+  const pct=Math.min((total/OXY_MAX)*100,100), remaining=Math.max(0,OXY_MAX-total);
+  const color=total>=OXY_MAX?'#e05c6a':pct>=75?'#f0a847':'#5ecfb1';
+  const expiryStr=expiry?' · next drops off at '+fmt(expiry):'';
+  const label=total>=OXY_MAX?'⚠️ 24h maximum reached'+expiryStr:remaining+'mg remaining in 24h window'+expiryStr;
+  const card=document.createElement('div'); card.className='counter-card';
+  card.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:0.75rem;font-weight:600;color:var(--text2)">Oxycodone — 24h total</span><span style="font-family:DM Mono,monospace;font-size:1rem;font-weight:600;color:'+color+'">'+total+'mg / '+OXY_MAX+'mg</span></div><div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;margin-bottom:5px"><div style="height:100%;border-radius:4px;width:'+pct+'%;background:'+color+';transition:width 0.4s"></div></div><div style="font-size:0.68rem;color:var(--text3)">'+label+'</div>';
+  container.appendChild(card);
+}
+
+// ── SCHEDULED MEDICATIONS ─────────────────────────────────────────────────────
+function getScheduledTakenKey(medId, slot) { return medId+'_'+slot; }
+
+function renderSchedule() {
+  const missedEl = document.getElementById('missed-doses-section');
+  const dueSoonEl= document.getElementById('due-soon-section');
+  const listEl   = document.getElementById('schedule-list');
+  missedEl.innerHTML=''; dueSoonEl.innerHTML=''; listEl.innerHTML='';
+  if(!schedMeds.length) { listEl.innerHTML='<p style="font-size:0.82rem;color:var(--text3)">No scheduled medications. Add them in Settings.</p>'; return; }
+
+  const now    = new Date();
+  const nowMins= now.getHours()*60+now.getMinutes();
+  const dayData= getDay(viewKey);
+  if(!dayData.scheduledDoses) dayData.scheduledDoses={};
+
+  const missed=[], dueSoon=[], allSlots=[];
+
+  // Build all slots across all scheduled meds
+  schedMeds.forEach(med => {
+    (med.times||[]).forEach(t => {
+      const [hh,mm]=t.split(':').map(Number);
+      const slotMins=hh*60+mm;
+      const key=getScheduledTakenKey(med.id,t);
+      const taken=!!(dayData.scheduledDoses[key]);
+      allSlots.push({med,time:t,slotMins,key,taken});
+    });
+  });
+  allSlots.sort((a,b)=>a.slotMins-b.slotMins);
+
+  // Missed: past slots not taken (today only)
+  if(isToday()) {
+    allSlots.forEach(slot => {
+      if(!slot.taken && slot.slotMins < nowMins-5) missed.push(slot);
+    });
+  }
+  // Due soon: upcoming within 2 hours
+  if(isToday()) {
+    allSlots.forEach(slot => {
+      if(!slot.taken && slot.slotMins>=nowMins-5 && slot.slotMins<=nowMins+120) dueSoon.push(slot);
+    });
+  }
+
+  // ── Missed doses ──
+  if(missed.length) {
+    const card=document.createElement('div'); card.className='card'; card.style.borderColor='var(--red)'; card.style.marginBottom='16px';
+    card.innerHTML='<p style="font-size:0.78rem;font-weight:600;color:var(--red);margin-bottom:10px">⚠️ Missed doses</p>';
+    missed.forEach(slot => {
+      const row=document.createElement('div'); row.style.cssText='padding:10px 0;border-bottom:1px solid var(--border)';
+      row.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:0.88rem;font-weight:600">'+slot.med.name+'</span><span style="font-family:DM Mono,monospace;font-size:0.82rem;color:var(--red)">'+slot.time+'</span></div>';
+      const btns=document.createElement('div'); btns.className='missed-actions';
+      const delayBtn=document.createElement('button'); delayBtn.className='missed-action-btn'; delayBtn.textContent='⏱ Delay 30 min';
+      delayBtn.onclick=()=>delayScheduledDose(slot.med.id,slot.time,30);
+      const takenBtn=document.createElement('button'); takenBtn.className='missed-action-btn'; takenBtn.textContent='✓ Taken at '+slot.time;
+      takenBtn.onclick=()=>markScheduledTaken(slot.med.id,slot.time,slot.time,true);
+      const cancelBtn=document.createElement('button'); cancelBtn.className='missed-action-btn danger'; cancelBtn.textContent='✕ Skip';
+      cancelBtn.onclick=()=>cancelScheduledDose(slot.med.id,slot.time);
+      btns.appendChild(delayBtn); btns.appendChild(takenBtn); btns.appendChild(cancelBtn);
+      row.appendChild(btns); card.appendChild(row);
+    });
+    missedEl.appendChild(card);
+  }
+
+  // ── Due soon ──
+  if(dueSoon.length) {
+    const card=document.createElement('div'); card.className='due-soon-card';
+    card.innerHTML='<div class="due-soon-title">⏰ Due soon</div>';
+    dueSoon.forEach(slot => {
+      const diffMins=Math.round(slot.slotMins-nowMins);
+      const item=document.createElement('div'); item.className='due-soon-item';
+      item.innerHTML='<span class="due-soon-name">'+slot.med.name+'</span><span class="due-soon-time">'+(diffMins<=0?'Now':slot.time+'')+'</span>';
+      card.appendChild(item);
+    });
+    dueSoonEl.appendChild(card);
+  }
+
+  // ── Full day schedule ──
+  // Group by time slot
+  const timeMap={};
+  allSlots.forEach(slot => {
+    if(!timeMap[slot.time]) timeMap[slot.time]=[];
+    timeMap[slot.time].push(slot);
+  });
+  Object.keys(timeMap).sort().forEach(t => {
+    const slots=timeMap[t];
+    const allTaken=slots.every(s=>s.taken);
+    const allDone=slots.every(s=>s.taken||s.skipped);
+    const isPast=isToday()&&(parseInt(t)*60+parseInt(t.split(':')[1])<nowMins-5);
+    const div=document.createElement('div');
+    div.className='schedule-slot'+(isPast&&!allDone?' missed-slot':'');
+    div.innerHTML='<div class="schedule-slot-time">'+t+(allTaken?' ✓':allDone?' ✕':'')+'</div>';
+    const medsDiv=document.createElement('div'); medsDiv.className='schedule-slot-meds';
+    slots.forEach(slot => {
+      const row=document.createElement('div'); row.className='schedule-med-row';
+      if(slot.taken) {
+        const takenInfo=dayData.scheduledDoses[slot.key];
+        row.innerHTML='<span class="schedule-med-name">'+slot.med.name+(slot.med.strengths&&takenInfo.strength?' <span style="color:var(--text3);font-size:0.78rem">'+takenInfo.strength+'</span>':'')+'</span><span class="schedule-med-taken">✓ '+fmt(takenInfo.ts)+'</span>';
+      } else if(slot.skipped) {
+        row.innerHTML='<span class="schedule-med-name" style="color:var(--text3);text-decoration:line-through">'+slot.med.name+'</span><span style="font-size:0.72rem;color:var(--text3)">✕ Skipped</span>';
+      } else {
+        row.innerHTML='<span class="schedule-med-name">'+slot.med.name+'</span>';
+        if(isToday()) {
+          if(slot.med.strengths&&slot.med.strengths.length) {
+            const wrap=document.createElement('div'); wrap.style.cssText='display:flex;gap:6px;align-items:center';
+            const sel=document.createElement('select'); sel.className='form-input'; sel.style.cssText='margin-bottom:0;flex:1;font-size:0.78rem;padding:5px 8px';
+            slot.med.strengths.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
+            const btn=document.createElement('button'); btn.className='schedule-check-btn';btn.textContent='Taken';
+            btn.onclick=()=>markScheduledTaken(slot.med.id,slot.time,null,false,sel.value);
+            wrap.appendChild(sel); wrap.appendChild(btn);
+            row.innerHTML='<span class="schedule-med-name">'+slot.med.name+'</span>';
+            row.appendChild(wrap);
+          } else {
+            const btn=document.createElement('button'); btn.className='schedule-check-btn'; btn.textContent='Taken';
+            btn.onclick=()=>markScheduledTaken(slot.med.id,slot.time);
+            row.appendChild(btn);
+          }
+        }
+      }
+      medsDiv.appendChild(row);
+    });
+    div.appendChild(medsDiv);
+    listEl.appendChild(div);
+  });
+  if(!Object.keys(timeMap).length) listEl.innerHTML='<p style="font-size:0.82rem;color:var(--text3)">No scheduled times set. Configure in Settings.</p>';
+}
+
+async function markScheduledTaken(medId, slot, overrideTime=null, wasRegularTime=false, strength=null) {
+  const dayData=getDay(viewKey);
+  if(!dayData.scheduledDoses) dayData.scheduledDoses={};
+  const key=getScheduledTakenKey(medId,slot);
+  let ts=Date.now();
+  if(overrideTime&&wasRegularTime) { const [hh,mm]=overrideTime.split(':').map(Number); const d=new Date(); d.setHours(hh,mm,0,0); ts=d.getTime(); }
+
+  dayData.scheduledDoses[key]={ts,strength};
+
+  // If this med is also PRN, record it there too
+  const med=schedMeds.find(m=>m.id===medId);
+  if(med&&med.isPRN) {
+    const prnMed=prnMeds.find(m=>m.name.toLowerCase()===med.name.toLowerCase());
+    if(prnMed) {
+      const prev=(dayData.meds||{})[prnMed.id];
+      const doses=(prev&&prev.doses?[...prev.doses]:[]);
+      if(prev&&prev.topupTs&&!doses.find(d=>d.ts===prev.topupTs)) doses.push({ts:prev.topupTs,strength:prev.topupStrength||null,isTopup:true});
+      doses.push({ts,strength:strength||null});
+      if(!dayData.meds) dayData.meds={};
+      dayData.meds[prnMed.id]={ts,strength:strength||null,topupTs:null,doses};
+    }
+  }
+  await saveData(); renderSchedule(); renderPRNMeds(); 
+}
+
+async function delayScheduledDose(medId,slot,mins) {
+  const now=new Date(); now.setMinutes(now.getMinutes()+mins);
+  const newTime=pad(now.getHours())+':'+pad(now.getMinutes());
+  const med=schedMeds.find(m=>m.id===medId);
+  if(!med) return;
+  med.times=med.times.filter(t=>t!==slot); med.times.push(newTime); med.times.sort();
+  await saveCfg(); renderSchedule(); renderSchedMedConfig();
+}
+async function cancelScheduledDose(medId,slot) {
+  const dayData=getDay(viewKey); if(!dayData.scheduledDoses) dayData.scheduledDoses={};
+  dayData.scheduledDoses[getScheduledTakenKey(medId,slot)]={skipped:true,ts:Date.now()};
+  await saveData(); renderSchedule();
+}
+
+// ── PRN MEDICATIONS ───────────────────────────────────────────────────────────
+window.openTake = (medId,strength,bdVal) => {
+  const med=prnMeds.find(m=>m.id===medId); let ts=Date.now();
+  if(bdVal){const [hh,mm]=bdVal.split(':').map(Number);const d=new Date();d.setHours(hh,mm,0,0);ts=d.getTime();}
+  openModal('Record '+med.name+(strength?' '+strength:''),bdVal?'Record dose taken at '+bdVal+' today?':'Record dose taken now ('+fmt(ts)+')?',
+    async()=>{const t=getDay(viewKey);const prev=t.meds[medId];const doses=(prev&&prev.doses?[...prev.doses]:[]);if(prev&&prev.topupTs&&!doses.find(d=>d.ts===prev.topupTs)){doses.push({ts:prev.topupTs,strength:prev.topupStrength||null,isTopup:true});}doses.push({ts,strength:strength||null});t.meds[medId]={ts,strength:strength||null,topupTs:null,doses};await saveData();renderPRNMeds();});
+};
+window.openTopUp = (medId,bdVal) => {
+  let ts=Date.now();
+  if(bdVal){const [hh,mm]=bdVal.split(':').map(Number);const d=new Date();d.setHours(hh,mm,0,0);ts=d.getTime();}
+  openModal('Record Oxycodone top-up',bdVal?'Record top-up at '+bdVal+'? Resets the 4-hour countdown.':'Record top-up now ('+fmt(ts)+')? Resets the 4-hour countdown.',
+    async()=>{const t=getDay(viewKey);const med=prnMeds.find(m=>m.name.toLowerCase().includes('oxycodone'));if(!med)return;if(t.meds[med.id]){const tRec=t.meds[med.id];tRec.topupTs=ts;tRec.topupStrength=null;if(!tRec.doses)tRec.doses=[];tRec.doses.push({ts,isTopup:true});}await saveData();renderPRNMeds();});
+};
+window.deletePRNMed = medId => {
+  const med=prnMeds.find(m=>m.id===medId);
+  openModal('Remove '+med.name+'?','Removes it from the list. Past data is kept.',async()=>{prnMeds=prnMeds.filter(m=>m.id!==medId);await saveCfg();renderPRNMeds();},true);
+};
+window.addPRNMed = async () => {
+  const name=document.getElementById('new-med-name').value.trim(),hoursRaw=document.getElementById('new-med-hours').value,hours=hoursRaw===''?null:parseInt(hoursRaw),strRaw=document.getElementById('new-med-strengths').value.trim();
+  if(!name){alert('Please enter a medication name.');return;}if(hours===null||isNaN(hours)||hours<0){alert('Please enter valid hours.');return;}
+  const strengths=strRaw?strRaw.split(',').map(s=>s.trim()).filter(Boolean):null;
+  const id=name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')+'-'+Date.now();
+  const nm={id,name,hours,noTimer:hours===0};if(strengths&&strengths.length)nm.strengths=strengths;
+  prnMeds.push(nm);await saveCfg();
+  document.getElementById('new-med-name').value='';document.getElementById('new-med-hours').value='';document.getElementById('new-med-strengths').value='';
+  renderPRNMeds();
+};
+
+function buildInlineCounter(med) {
+  const isOxy=med.name.toLowerCase().includes('oxycodone');
+  const isCannabis=med.name.toLowerCase()==='cannabis oil';
+  if(!isOxy&&!isCannabis) return null;
+  if(!isToday()) return null;
+
+  let total, expiry, maxVal, unit, label;
+  if(isOxy) {
+    total=getOxyLast24h(med.id); expiry=getNextOxyExpiry(med.id); maxVal=OXY_MAX; unit='mg'; label='Oxycodone — 24h total';
+  } else {
+    // Cannabis Oil counter
+    const cutoff=Date.now()-24*3600000; total=0;
+    [todayKey(),yesterdayKey()].forEach(k=>{ const r=(state[k]||{}).meds?.[med.id]; if(!r) return; if(r.doses&&r.doses.length) r.doses.forEach(d=>{if(d.ts>=cutoff){const m=d.strength?d.strength.match(/([0-9.]+)/):null;total+=m?parseFloat(m[1]):0;}}); else if(r.ts>=cutoff&&r.strength){const m=r.strength.match(/([0-9.]+)/);total+=m?parseFloat(m[1]):0;} });
+    total=Math.round(total*100)/100;
+    const ts2=[]; [todayKey(),yesterdayKey()].forEach(k=>{ const r=(state[k]||{}).meds?.[med.id]; if(!r) return; if(r.doses&&r.doses.length) r.doses.forEach(d=>{if(d.ts>=cutoff)ts2.push(d.ts);}); else if(r.ts>=cutoff) ts2.push(r.ts); });
+    expiry=ts2.length?Math.min(...ts2)+24*3600000:null;
+    maxVal=1.2; unit='ml'; label='Cannabis Oil — 24h total';
+  }
+
+  const pct=Math.min((total/maxVal)*100,100), remaining=Math.round((maxVal-total)*100)/100;
+  const color=total>=maxVal?'#c0392b':pct>=75?'#b7770d':'#077FFF';
+  const expiryStr=expiry?' · next drops off at '+fmt(expiry):'';
+  const labelText=total>=maxVal?'⚠️ 24h maximum reached'+expiryStr:remaining+unit+' remaining in 24h window'+expiryStr;
+
+  const card=document.createElement('div');
+  card.style.cssText='background:var(--surface);border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;border-bottom:none;padding:14px 16px;margin-bottom:0';
+  card.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:0.75rem;font-weight:600;color:var(--text2)">'+label+'</span><span style="font-family:DM Mono,monospace;font-size:1rem;font-weight:600;color:'+color+'">'+total+unit+' / '+maxVal+unit+'</span></div><div style="background:var(--surface2);border-radius:4px;height:5px;overflow:hidden;margin-bottom:5px"><div style="height:100%;border-radius:4px;width:'+pct+'%;background:'+color+';transition:width 0.4s"></div></div><div style="font-size:0.68rem;color:var(--text3)">'+labelText+'</div>';
+  return card;
+}
+
+function renderPRNMeds() {
+  const container=document.getElementById('med-list'); container.innerHTML='';
+  const past=!isToday();
+  prnMeds.forEach(med => {
+    let rec, carried;
+    if(isToday()) { const r=getCarriedRecord(med.id,med.hours); rec=r.rec; carried=r.carried; }
+    else { rec=(getDay(viewKey).meds||{})[med.id]||null; carried=false; }
+    const todayActualRec=(state[todayKey()]||{}).meds?.[med.id]||null;
+    const ts=rec?rec.ts:null;
+    const timerTs=(rec&&rec.topupTs)?rec.topupTs:ts;
+    const cds=(past||med.noTimer)?null:cdown(timerTs,med.hours);
+    const ready=(past||med.noTimer)?false:(!timerTs||cds==='Ready');
+
+    const card=document.createElement('div');
+    card.className='med-card '+(carried?'waiting':ready?'ready':'waiting');
+
+    const header=document.createElement('div'); header.className='med-header';
+    header.innerHTML='<span class="med-name">'+med.name+'</span>'+(todayActualRec&&todayActualRec.doses&&todayActualRec.doses.length>=2?'<span class="dose-count-badge">'+todayActualRec.doses.length+'x today</span>':'')+'<div class="med-meta"><span class="med-interval">every '+med.hours+'h</span>'+(isToday()?'<button class="med-delete-btn" onclick="deletePRNMed(\''+med.id+'\')">✕</button>':'')+'</div>';
+    card.appendChild(header);
+
+    const statusRow=document.createElement('div'); statusRow.className='med-status';
+    const badge=document.createElement('span');
+    badge.className='status-badge '+(past?(ts?'taken':'never'):med.noTimer?(ts?'taken':'never'):(timerTs?(ready?'ready':'waiting'):'never'));
+    badge.textContent=past?(ts?'Taken':'Not taken'):med.noTimer?(ts?'Taken today':'Not yet taken'):(timerTs?(ready?'Ready':'Waiting'):'Not yet taken');
+    statusRow.appendChild(badge);
+    if(!past&&!med.noTimer&&timerTs&&!ready){ const cs=document.createElement('span');cs.className='countdown';cs.id='cd-'+med.id;cs.textContent=cds;statusRow.appendChild(cs); }
+    card.appendChild(statusRow);
+
+    if(ts) {
+      const td=document.createElement('div'); td.className='med-times';
+      const lines=[];
+      if(carried) lines.push('<span style="color:var(--amber);font-style:italic">Carried from yesterday</span>');
+      lines.push('Last dose: '+fmt(ts)+(rec.strength?' · '+rec.strength:''));
+      if(rec.topupTs) lines.push('Top-up: '+fmt(rec.topupTs));
+      if(!past&&!med.noTimer){ const nt=nextAvailTime(timerTs,med.hours); if(nt&&!ready) lines.push('Next available: <span class="next-time">'+nt+'</span>'); }
+      td.innerHTML=lines.join('<br>'); card.appendChild(td);
+    }
+
+    if(isToday()) {
+      if(med.strengths) {
+        const row=document.createElement('div'); row.className='strength-row';
+        med.strengths.forEach(str=>{const btn=document.createElement('button');btn.className='strength-btn'+(selStr[med.id]===str?' selected':'');btn.textContent=str;btn.onclick=()=>{selStr[med.id]=str;renderPRNMeds();};row.appendChild(btn);});
+        card.appendChild(row);
+      }
+      const ns=med.strengths&&!selStr[med.id];
+      const tb=document.createElement('button'); tb.className='take-btn'+(ns?' disabled':'');
+      tb.textContent=ns?'Select a strength above':(carried?'Record new dose today':'Record '+med.name);
+      if(!ns) tb.onclick=()=>{const bi=card.querySelector('.backdate-input');window.openTake(med.id,selStr[med.id]||null,bi&&bi.value?bi.value:null);};
+      card.appendChild(tb);
+
+      // Oxy top-up
+      const todayRec2=(state[todayKey()]||{}).meds?.[med.id];
+      const isOxy=med.name.toLowerCase().includes('oxycodone');
+      if(isOxy&&todayRec2&&!todayRec2.topupTs) {
+        const availAt=todayRec2.ts+TOPUP_AFTER_HOURS*3600000,available=Date.now()>=availAt,wm=Math.ceil((availAt-Date.now())/60000);
+        const tuBtn=document.createElement('button');tuBtn.className='topup-btn'+(available?'':' disabled');tuBtn.id='topup-btn-'+med.id;
+        tuBtn.textContent=available?'Record top-up':'Top-up not yet available';
+        tuBtn.onclick=()=>{const bi2=card.querySelector('.backdate-topup');window.openTopUp(med.id,bi2&&bi2.value?bi2.value:null);};
+        card.appendChild(tuBtn);
+        if(!available){const info=document.createElement('div');info.className='topup-info';info.id='topup-info-'+med.id;info.textContent='Available in ~'+wm+' min';card.appendChild(info);}
+        const bt2=document.createElement('button');bt2.className='backdate-toggle';bt2.textContent='Backdate top-up time?';bt2.onclick=()=>card.querySelector('.bd-topup-row').classList.toggle('show');card.appendChild(bt2);
+        const br2=document.createElement('div');br2.className='backdate-row bd-topup-row';br2.innerHTML='<input type="time" class="backdate-topup"><button onclick="this.parentElement.classList.remove(\'show\')">✕</button>';card.appendChild(br2);
+      }
+      const bt=document.createElement('button');bt.className='backdate-toggle';bt.textContent='Backdate dose time?';bt.onclick=()=>card.querySelector('.bd-main-row').classList.toggle('show');card.appendChild(bt);
+      const br=document.createElement('div');br.className='backdate-row bd-main-row';br.innerHTML='<input type="time" class="backdate-input"><button onclick="this.parentElement.classList.remove(\'show\')">✕</button>';card.appendChild(br);
+      const hb=document.createElement('button');hb.className='med-history-btn';hb.textContent='📋 View dose history';hb.onclick=()=>openMedHist(med.id);card.appendChild(hb);
+    }
+    const counterCard=buildInlineCounter(med);
+    if(counterCard) { card.style.borderTopLeftRadius='0'; card.style.borderTopRightRadius='0'; container.appendChild(counterCard); }
+    container.appendChild(card);
+  });
+  if(!prnMeds.length) container.innerHTML='<p class="empty-state">No PRN medications. Add one below.</p>';
+}
+
+// ── MED HISTORY ───────────────────────────────────────────────────────────────
+window.openMedHist = medId => {
+  const med=prnMeds.find(m=>m.id===medId); if(!med) return;
+  document.getElementById('med-hist-title').textContent=med.name+' — dose history';
+  const content=document.getElementById('med-hist-content'); content.innerHTML='';
+  const allDays=Object.keys(state).sort().reverse();
+  let hasAny=false;
+  allDays.forEach(k=>{ const r=(state[k]||{}).meds?.[medId]; if(!r) return; hasAny=true;
+    const dl=document.createElement('div');dl.className='med-hist-day';dl.textContent=fmtKey(k)+' ('+k+')';content.appendChild(dl);
+    const doses=r.doses&&r.doses.length?r.doses:[{ts:r.ts,strength:r.strength||null}];
+    doses.forEach((d,i)=>{ const el=document.createElement('div');el.className='med-hist-entry';
+      el.innerHTML='<span class="med-hist-time">'+fmt(d.ts)+'</span><span class="med-hist-detail">'+(d.strength||'')+(d.isTopup?' (top-up)':'')+'</span>';
+      const delBtn=document.createElement('button');delBtn.className='med-hist-del';delBtn.textContent='×';
+      delBtn.onclick=()=>{openModal('Delete dose?','Remove this dose record?',async()=>{const day=getDay(k);if(day.meds[medId]&&day.meds[medId].doses){day.meds[medId].doses.splice(i,1);if(!day.meds[medId].doses.length)delete day.meds[medId];else{day.meds[medId].ts=day.meds[medId].doses[day.meds[medId].doses.length-1].ts;}}await saveData();openMedHist(medId);renderPRNMeds();},true);};
+      el.appendChild(delBtn);content.appendChild(el);
+    });
+  });
+  if(!hasAny) content.innerHTML='<div class="med-hist-none">No history yet.</div>';
+  document.getElementById('med-hist-overlay').classList.add('show');
+};
+window.closeMedHist = () => document.getElementById('med-hist-overlay').classList.remove('show');
+
+// ── FOOD ──────────────────────────────────────────────────────────────────────
+window.addFood    = async () => { const inp=document.getElementById('food-input'),text=inp.value.trim();if(!text)return;const t=getDay(viewKey);if(!t.food)t.food=[];t.food.push({text,ts:Date.now()});inp.value='';await saveData();renderFood(); };
+window.deleteFood = async idx => { const t=getDay(viewKey);t.food.splice(idx,1);await saveData();renderFood(); };
+function renderFood() {
+  const t=getDay(viewKey),list=document.getElementById('food-list');list.innerHTML='';
+  document.getElementById('food-title').textContent=(isToday()?'Today':fmtKey(viewKey))+"'s food & drink log";
+  if(!t.food||!t.food.length){list.innerHTML='<div class="empty-state" style="padding:20px 0">No entries for this day.</div>';return;}
+  t.food.forEach((item,i)=>{const d=document.createElement('div');d.className='food-entry';d.innerHTML='<span class="food-entry-text">'+item.text+'</span><span class="food-entry-time">'+fmt(item.ts)+'</span>'+(isToday()?'<button class="food-entry-del" onclick="deleteFood('+i+')">×</button>':'');list.appendChild(d);});
+}
+
+// ── WISHLIST ──────────────────────────────────────────────────────────────────
+window.openWishlist  = () => { renderWishlist(); document.getElementById('wishlist-overlay').classList.add('show'); };
+window.closeWishlist = () => document.getElementById('wishlist-overlay').classList.remove('show');
+window.addWishlistItem = async () => { const inp=document.getElementById('wishlist-input'),text=inp.value.trim();if(!text)return;wishlist.push({text,ts:Date.now()});inp.value='';await saveWishlist();renderWishlist(); };
+window.deleteWishlistItem = async idx => { wishlist.splice(idx,1);await saveWishlist();renderWishlist(); };
+function renderWishlist() {
+  const items=document.getElementById('wishlist-items');items.innerHTML='';
+  document.getElementById('wishlist-count').textContent=wishlist.length;
+  if(!wishlist.length){items.innerHTML='<div class="wishlist-empty">Nothing on the wishlist yet.</div>';return;}
+  wishlist.forEach((item,i)=>{const d=document.createElement('div');d.className='wishlist-item';d.innerHTML='<span class="wishlist-item-text">'+item.text+'</span><button class="wishlist-item-del" onclick="deleteWishlistItem('+i+')">×</button>';items.appendChild(d);});
+}
+
+// ── WALKS ─────────────────────────────────────────────────────────────────────
+window.toggleWalk = async time => { if(!isToday())return;const t=getDay(viewKey);if(!t.walks)t.walks={};t.walks[time]=!t.walks[time];await saveData();renderWalks(); };
+function renderWalks() {
+  const t=getDay(viewKey),grid=document.getElementById('walk-grid');grid.innerHTML='';let done=0;
+  const past=!isToday();
+  document.getElementById('walk-title').textContent='Hourly walks — 9:30am to 9:30pm'+(past?' ('+fmtKey(viewKey)+')':'');
+  document.getElementById('walk-label').textContent='Walks completed '+(past?fmtKey(viewKey):'today');
+  WALK_TIMES.forEach(time=>{
+    const isDone=!!(t.walks&&t.walks[time]);if(isDone)done++;
+    const s=document.createElement('div');s.className='walk-slot'+(isDone?' done':'')+(past?' readonly':'');
+    if(!past)s.onclick=()=>window.toggleWalk(time);
+    s.innerHTML='<div class="walk-checkbox"><span class="walk-checkmark">✓</span></div><span class="walk-time">'+time+'</span>';
+    grid.appendChild(s);
+  });
+  document.getElementById('walk-count').textContent=done+' / 13';
+  document.getElementById('walk-bar').style.width=(done/13*100)+'%';
+}
+
+// ── WEIGHT ────────────────────────────────────────────────────────────────────
+window.logWeight = async usePast => {
+  const val=parseFloat(document.getElementById('weight-input').value);if(!val||val<20||val>300){alert('Please enter a valid weight in kg.');return;}
+  let key;if(usePast){const dv=document.getElementById('weight-past-date').value;if(!dv){alert('Please select a date.');return;}if(dv>todayKey()){alert("Can't log a future date.");return;}key=dv;}else{key=todayKey();}
+  const doSave=async()=>{weightLog[key]={kg:val,ts:Date.now()};document.getElementById('weight-input').value='';document.getElementById('weight-past-date').value='';document.getElementById('past-weight-section').classList.remove('show');await saveWeight();renderWeight();};
+  if(weightLog[key])openModal('Update entry?','Already have '+weightLog[key].kg.toFixed(1)+' kg for '+fmtKey(key)+'. Replace with '+val.toFixed(1)+' kg?',doSave);else await doSave();
+};
+window.deleteWeight = async key => { openModal('Remove entry?','Delete weight for '+fmtKey(key)+'?',async()=>{delete weightLog[key];await saveWeight();renderWeight();},true); };
+function renderWeight() {
+  const keys=Object.keys(weightLog).sort();
+  if(keys.length){const vals=keys.map(k=>weightLog[k].kg),latest=vals[vals.length-1],highest=Math.max(...vals),change=latest-vals[0];document.getElementById('ws-current').textContent=latest.toFixed(1)+' kg';document.getElementById('ws-highest').textContent=highest.toFixed(1)+' kg';document.getElementById('ws-lost').textContent=(change>=0?'+':'')+change.toFixed(1)+' kg';}
+  else{['ws-current','ws-highest','ws-lost'].forEach(id=>document.getElementById(id).textContent='—');}
+  const sdw=document.getElementById('weight-day-section');sdw.innerHTML='';
+  const entry=weightLog[viewKey];
+  const dayCard=document.createElement('div');dayCard.className='weight-day-card';
+  if(entry){dayCard.innerHTML='<div class="section-title">'+fmtKey(viewKey)+'</div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px"><span class="weight-day-val">'+entry.kg.toFixed(1)+' kg</span><button class="weight-entry-del" onclick="deleteWeight(\''+viewKey+'\')" style="font-size:0.85rem">× Remove</button></div>';}
+  else{dayCard.innerHTML='<div class="section-title">'+fmtKey(viewKey)+'</div><div class="weight-none">No weight logged for this day</div>';}
+  sdw.appendChild(dayCard);
+  const gc=document.getElementById('weight-graph-card');
+  if(keys.length>=2){gc.style.display='';const labels=keys.map(fmtDateShort),data=keys.map(k=>weightLog[k].kg),minV=Math.min(...data)-1,maxV=Math.max(...data)+1,ptColors=keys.map(k=>k===viewKey?'#f0a847':'#5ecfb1'),ptRadius=keys.map(k=>k===viewKey?7:4);
+    if(wChart)wChart.destroy();const ctx=document.getElementById('weight-chart').getContext('2d');
+    wChart=new Chart(ctx,{type:'line',data:{labels,datasets:[{data,borderColor:'#5ecfb1',backgroundColor:'rgba(94,207,177,0.08)',borderWidth:2,pointBackgroundColor:ptColors,pointRadius:ptRadius,tension:0.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y.toFixed(1)+' kg'},backgroundColor:'#1e2736',titleColor:'#8a9ab5',bodyColor:'#e8edf5',borderColor:'#2a3649',borderWidth:1}},scales:{x:{ticks:{color:'#5a6a82',font:{size:10}},grid:{color:'#1e2736'}},y:{min:minV,max:maxV,ticks:{color:'#5a6a82',font:{size:10},callback:v=>v.toFixed(1)},grid:{color:'#1e2736'}}}}});}
+  else{gc.style.display='none';if(wChart){wChart.destroy();wChart=null;}}
+
+  // Weight history list
+  const histEl=document.getElementById('weight-history-list'); if(!histEl) return;
+  histEl.innerHTML='';
+  if(keys.length){
+    const wrap=document.createElement('div');
+    wrap.innerHTML='<p class="section-title" style="margin-top:8px;margin-bottom:10px">All entries</p>';
+    [...keys].reverse().forEach(k=>{
+      const entry=weightLog[k];
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px';
+      row.innerHTML='<div><div style="font-size:0.88rem;font-weight:600">'+entry.kg.toFixed(1)+' kg</div><div style="font-size:0.72rem;color:var(--text3);margin-top:2px">'+fmtKey(k)+'</div></div><button class="weight-entry-del" onclick="deleteWeight(\''+k+'\')" style="font-size:0.85rem">× Remove</button>';
+      wrap.appendChild(row);
+    });
+    histEl.appendChild(wrap);
+  }
+}
+
+// ── PAIN ──────────────────────────────────────────────────────────────────────
+window.logPainNow = async () => {
+  if(selPainScore==null||!isToday())return;
+  const comment=document.getElementById('pain-comment').value.trim(),now=new Date(),slot=pad(now.getHours())+':00';
+  getPainDay(viewKey).push({ts:Date.now(),score:selPainScore,comment,slot,extra:false});
+  selPainScore=null;document.getElementById('pain-comment').value='';
+  buildScoreGrid('pain-score-grid',()=>selPainScore,v=>{selPainScore=v;});updatePainLogBtn();
+  await savePain();renderPainDay();renderPainCompare();
+};
+window.logPainExtra = async () => {
+  if(selExtraScore==null){alert('Please select a pain score.');return;}
+  const timeVal=document.getElementById('pain-extra-time').value;if(!timeVal){alert('Please select a time.');return;}
+  const comment=document.getElementById('pain-extra-comment').value.trim(),[hh,mm]=timeVal.split(':').map(Number),d=new Date();d.setHours(hh,mm,0,0);
+  getPainDay(viewKey).push({ts:d.getTime(),score:selExtraScore,comment,slot:pad(hh)+':00',extra:true});
+  selExtraScore=null;document.getElementById('pain-extra-time').value='';document.getElementById('pain-extra-comment').value='';
+  buildScoreGrid('pain-extra-score-grid',()=>selExtraScore,v=>{selExtraScore=v;});
+  await savePain();renderPainDay();renderPainCompare();
+};
+window.deletePainEntry = async idx => {
+  openModal('Remove entry?','Delete this pain check-in?',async()=>{const day=getPainDay(viewKey);day.splice(idx,1);painLog[viewKey]=day;await savePain();renderPainDay();renderPainCompare();},true);
+};
+window.logPainSlot = slotHour => {
+  if(!isToday())return;let slotScore=null;
+  openModal('Log pain for '+slotHour,'Select a score for this hour:',
+    async()=>{if(slotScore==null){alert('Please select a score.');return;}const comment=(document.getElementById('modal-slot-comment')||{}).value||'';const [hh]=slotHour.split(':').map(Number),d=new Date();d.setHours(hh,0,0,0);getPainDay(viewKey).push({ts:d.getTime(),score:slotScore,comment:comment.trim(),slot:slotHour,extra:false});await savePain();renderPainDay();renderPainCompare();},
+    false,'<div id="modal-slot-grid" style="margin-bottom:8px"></div><div class="pain-scale-label"><span>No pain</span><span>Worst</span></div><input type="text" class="modal-comment-input" id="modal-slot-comment" placeholder="Optional comment">');
+  setTimeout(()=>buildModalScoreGrid('modal-slot-grid',()=>slotScore,v=>{slotScore=v;}),50);
+};
+function renderPainDay() {
+  const today=getPainDay(viewKey),sorted=[...today].sort((a,b)=>a.ts-b.ts);
+  document.getElementById('pain-chart-title').textContent='Pain — '+fmtKey(viewKey);
+  document.getElementById('pain-slots-title').textContent='Hourly slots — '+fmtKey(viewKey);
+  document.getElementById('pain-quick-title').textContent=isToday()?'Log pain now ('+pad(new Date().getHours())+':00)':'Log pain (today only)';
+  if(sorted.length){const scores=sorted.map(e=>e.score),avg=scores.reduce((a,b)=>a+b,0)/scores.length,low=Math.min(...scores),high=Math.max(...scores);document.getElementById('ps-avg').textContent=fmtScore(parseFloat(avg.toFixed(2)));document.getElementById('ps-avg').style.color=painColor(avg);document.getElementById('ps-low').textContent=fmtScore(low);document.getElementById('ps-low').style.color=painColor(low);document.getElementById('ps-high').textContent=fmtScore(high);document.getElementById('ps-high').style.color=painColor(high);}
+  else{['ps-avg','ps-low','ps-high'].forEach(id=>{document.getElementById(id).textContent='—';document.getElementById(id).style.color='';});}
+  const ptc=document.getElementById('pain-today-chart-card');
+  if(sorted.length>=1){ptc.style.display='';if(painTodayChart)painTodayChart.destroy();const ctx=document.getElementById('pain-today-chart').getContext('2d');painTodayChart=new Chart(ctx,{type:'line',data:{labels:sorted.map(e=>fmt(e.ts)),datasets:[{data:sorted.map(e=>e.score),borderColor:'#e05c6a',backgroundColor:'rgba(224,92,106,0.06)',borderWidth:2,pointBackgroundColor:sorted.map(e=>painColor(e.score)),pointRadius:6,tension:0.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const e=sorted[c.dataIndex];return'Pain '+fmtScore(c.parsed.y)+(e.comment?' — '+e.comment:'');}},backgroundColor:'#1e2736',titleColor:'#8a9ab5',bodyColor:'#e8edf5',borderColor:'#2a3649',borderWidth:1}},scales:{x:{ticks:{color:'#5a6a82',font:{size:9},maxRotation:45},grid:{color:'#1e2736'}},y:{min:0,max:10,ticks:{color:'#5a6a82',font:{size:10},stepSize:1},grid:{color:'#1e2736'}}}}});}
+  else{ptc.style.display='none';if(painTodayChart){painTodayChart.destroy();painTodayChart=null;}}
+  const wrap=document.getElementById('pain-slots');wrap.innerHTML='';
+  PAIN_HOURS.forEach(hour=>{const entries=today.filter(e=>e.slot===hour);const div=document.createElement('div');div.className='pain-slot'+(entries.length?' logged':'');const timeEl='<span class="pain-slot-time">'+hour+'</span>';
+    if(entries.length){const eHtml=entries.map(e=>{const gi=today.indexOf(e),sc=painColor(e.score);return'<div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0"><span class="pain-slot-score" style="color:'+sc+'">'+fmtScore(e.score)+'</span>'+(e.comment?'<span class="pain-slot-comment">'+e.comment+'</span>':'')+(isToday()?'<button class="pain-slot-del" onclick="deletePainEntry('+gi+')">×</button>':'')+'</div>';}).join('');div.innerHTML=timeEl+'<div style="flex:1;display:flex;flex-direction:column;gap:4px">'+eHtml+'</div>'+(isToday()?'<button class="pain-slot-log-btn" onclick="logPainSlot(\''+hour+'\')">＋</button>':'');}
+    else{div.innerHTML=timeEl+'<span class="pain-slot-empty">No entry</span>'+(isToday()?'<button class="pain-slot-log-btn" onclick="logPainSlot(\''+hour+'\')">Log</button>':'');}
+    wrap.appendChild(div);
+  });
+}
+function renderPainCompare() {
+  const allDays=Object.keys(painLog).filter(k=>painLog[k]&&painLog[k].length).sort();
+  if(painAvgChart)painAvgChart.destroy();
+  if(allDays.length>=1){const labels=allDays.map(fmtDateShort),data=allDays.map(k=>{const avg=dayAvg(painLog[k]);return avg?parseFloat(avg.toFixed(2)):null;}),ptColors=data.map(v=>v?painColor(v):'transparent');const ctx=document.getElementById('pain-avg-chart').getContext('2d');painAvgChart=new Chart(ctx,{type:'line',data:{labels,datasets:[{data,borderColor:'#e05c6a',backgroundColor:'rgba(224,92,106,0.07)',borderWidth:2,pointBackgroundColor:ptColors,pointRadius:5,tension:0.3,fill:true,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Avg: '+fmtScore(c.parsed.y)},backgroundColor:'#1e2736',titleColor:'#8a9ab5',bodyColor:'#e8edf5',borderColor:'#2a3649',borderWidth:1}},scales:{x:{ticks:{color:'#5a6a82',font:{size:10}},grid:{color:'#1e2736'}},y:{min:0,max:10,ticks:{color:'#5a6a82',font:{size:10},stepSize:1},grid:{color:'#1e2736'}}}}});}
+  const tw=document.getElementById('day-toggles');tw.innerHTML='';
+  allDays.forEach((k,idx)=>{const pill=document.createElement('button'),ci=idx%DAY_COLORS.length;pill.className='day-pill'+(activeDays.has(k)?' active':'');pill.style.setProperty('--pill-c',DAY_COLORS[ci]);pill.textContent=fmtKey(k);pill.onclick=()=>{if(activeDays.has(k))activeDays.delete(k);else activeDays.add(k);renderPainCompare();};tw.appendChild(pill);});
+  if(!allDays.length)tw.innerHTML='<p style="font-size:0.78rem;color:var(--text3)">No pain data yet.</p>';
+  if(painCmpChart)painCmpChart.destroy();
+  const active=[...activeDays].sort();
+  const datasets=active.map(k=>{const col=DAY_COLORS[allDays.indexOf(k)%DAY_COLORS.length],entries=[...(painLog[k]||[])].sort((a,b)=>a.ts-b.ts),hourMap={};entries.forEach(e=>{const h=e.slot||pad(new Date(e.ts).getHours())+':00';if(!hourMap[h])hourMap[h]=[];hourMap[h].push(e.score);});const data=PAIN_HOURS.map(h=>hourMap[h]?parseFloat((hourMap[h].reduce((a,b)=>a+b,0)/hourMap[h].length).toFixed(2)):null);return{label:fmtKey(k),data,borderColor:col,backgroundColor:'transparent',borderWidth:2,pointBackgroundColor:col,pointRadius:4,tension:0.3,spanGaps:false};});
+  const ctx=document.getElementById('pain-compare-chart').getContext('2d');
+  painCmpChart=new Chart(ctx,{type:'line',data:{labels:PAIN_HOURS,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:active.length>0,labels:{color:'#8a9ab5',font:{size:10},boxWidth:12}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtScore(c.parsed.y)},backgroundColor:'#1e2736',titleColor:'#8a9ab5',bodyColor:'#e8edf5',borderColor:'#2a3649',borderWidth:1}},scales:{x:{ticks:{color:'#5a6a82',font:{size:8},maxTicksLimit:8},grid:{color:'#1e2736'}},y:{min:0,max:10,ticks:{color:'#5a6a82',font:{size:10},stepSize:1},grid:{color:'#1e2736'}}}}});
+  const sel=document.getElementById('drilldown-select'),prev=sel.value;sel.innerHTML='';
+  allDays.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=fmtKey(k)+' ('+painLog[k].length+' entries)';sel.appendChild(o);});if(prev&&allDays.includes(prev))sel.value=prev;
+}
+window.renderDrilldown = () => {
+  const k=document.getElementById('drilldown-select').value,container=document.getElementById('drilldown-content');
+  if(!k||!painLog[k]){container.innerHTML='<p class="empty-state" style="padding:20px">No data for this day.</p>';return;}
+  const entries=[...(painLog[k]||[])].sort((a,b)=>a.ts-b.ts);container.innerHTML='';
+  if(entries.length>=2){const wrap=document.createElement('div');wrap.className='graph-wrap';wrap.style.height='130px';wrap.style.marginBottom='12px';const canvas=document.createElement('canvas');wrap.appendChild(canvas);container.appendChild(wrap);const col=DAY_COLORS[Object.keys(painLog).sort().indexOf(k)%DAY_COLORS.length];new Chart(canvas.getContext('2d'),{type:'line',data:{labels:entries.map(e=>fmt(e.ts)),datasets:[{data:entries.map(e=>e.score),borderColor:col,backgroundColor:'transparent',borderWidth:2,pointBackgroundColor:entries.map(e=>painColor(e.score)),pointRadius:5,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const e=entries[c.dataIndex];return'Pain '+fmtScore(c.parsed.y)+(e.comment?' — '+e.comment:'');}},backgroundColor:'#1e2736',titleColor:'#8a9ab5',bodyColor:'#e8edf5',borderColor:'#2a3649',borderWidth:1}},scales:{x:{ticks:{color:'#5a6a82',font:{size:9},maxRotation:45},grid:{color:'#1e2736'}},y:{min:0,max:10,ticks:{color:'#5a6a82',font:{size:10},stepSize:1},grid:{color:'#1e2736'}}}}});}
+  entries.forEach(e=>{const el=document.createElement('div');el.className='pain-slot logged';const sc=painColor(e.score);el.innerHTML='<span class="pain-slot-time">'+fmt(e.ts)+'</span><span class="pain-slot-score" style="color:'+sc+'">'+fmtScore(e.score)+'</span><span class="pain-slot-comment">'+(e.comment||'')+'</span>';container.appendChild(el);});
+};
+window.switchPainSub = btn => {
+  document.querySelectorAll('.pain-subtab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.pain-subpane').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');document.getElementById('pain-sub-'+btn.dataset.sub).classList.add('active');
+  if(btn.dataset.sub==='compare')renderPainCompare();
+  if(btn.dataset.sub==='today')renderPainDay();
+};
+
+// ── REST & PACING ─────────────────────────────────────────────────────────────
+window.setPacingDay = async type => {
+  const d=getPacingDay(viewKey); d.pacingType=type; pacingLog[viewKey]=d;
+  await savePacing(); renderPacing();
+};
+window.logEnergyCheckin = async () => {
+  const energy=parseInt(document.getElementById('energy-slider').value), mood=parseInt(document.getElementById('mood-slider').value);
+  const d=getPacingDay(viewKey); if(!d.checkins) d.checkins=[]; d.checkins.push({ts:Date.now(),energy,mood}); pacingLog[viewKey]=d;
+  await savePacing(); renderPacing(); renderPacingChart();
+};
+window.logRest = async () => {
+  const start=document.getElementById('rest-start').value, end=document.getElementById('rest-end').value;
+  if(!start||!end){alert('Please enter start and end times.');return;}
+  const t=getDay(viewKey); if(!t.rest)t.rest=[]; t.rest.push({start,end,ts:Date.now()});
+  document.getElementById('rest-start').value=''; document.getElementById('rest-end').value='';
+  await saveData(); renderPacing();
+};
+window.deleteRest = async idx => { const t=getDay(viewKey);t.rest.splice(idx,1);await saveData();renderPacing(); };
+function renderPacing() {
+  const d=getPacingDay(viewKey); const t=getDay(viewKey);
+  document.getElementById('pacing-title').textContent='Rest & Pacing — '+fmtKey(viewKey);
+  // Pacing type buttons
+  ['green','amber','rest'].forEach(type=>{
+    const btn=document.getElementById('pacing-'+type);
+    btn.className='pacing-btn '+type+(d.pacingType===type?' active':'');
+  });
+  document.getElementById('pacing-guidance').textContent=d.pacingType?PACING_GUIDANCE[d.pacingType]:'Tap a day type above to get pacing guidance.';
+  // Latest check-in
+  const todayCheckins=(d.checkins||[]);
+  const energyTodayEl=document.getElementById('energy-today'); energyTodayEl.innerHTML='';
+  if(todayCheckins.length) {
+    const latest=todayCheckins[todayCheckins.length-1];
+    energyTodayEl.innerHTML='<p style="font-size:0.78rem;color:var(--text3);margin-top:4px">Last check-in: <span style="color:var(--accent)">Energy '+latest.energy+'/10, Mood '+latest.mood+'/10</span> at '+fmt(latest.ts)+'</p>';
+  }
+  // Rest log
+  const restList=document.getElementById('rest-list'); restList.innerHTML='';
+  document.getElementById('rest-log-title').textContent='Rest log — '+fmtKey(viewKey);
+  if(!t.rest||!t.rest.length){restList.innerHTML='<div class="empty-state" style="padding:20px 0">No rest periods logged.</div>';return;}
+  t.rest.forEach((r,i)=>{const el=document.createElement('div');el.className='rest-entry';el.innerHTML='<div class="rest-entry-info">'+r.start+' – '+r.end+'</div>'+(isToday()?'<button class="rest-entry-del" onclick="deleteRest('+i+')">×</button>':'');restList.appendChild(el);});
+}
+function renderPacingChart() {
+  const last14=[]; const today=todayKey(); const d=new Date();
+  for(let i=13;i>=0;i--){const dd=new Date(d);dd.setDate(d.getDate()-i);const k=dd.getFullYear()+'-'+pad(dd.getMonth()+1)+'-'+pad(dd.getDate());last14.push(k);}
+  const energyData=last14.map(k=>{const pd=pacingLog[k];if(!pd||!pd.checkins||!pd.checkins.length)return null;const avg=pd.checkins.reduce((a,b)=>a+b.energy,0)/pd.checkins.length;return parseFloat(avg.toFixed(1));});
+  const hasData=energyData.some(v=>v!==null);
+  const card=document.getElementById('pacing-history-card');
+  if(!hasData){card.style.display='none';return;}
+  card.style.display='';
+  if(pacingChart)pacingChart.destroy();
+  const ctx=document.getElementById('pacing-chart').getContext('2d');
+  pacingChart=new Chart(ctx,{type:'line',data:{labels:last14.map(fmtDateShort),datasets:[{label:'Energy',data:energyData,borderColor:'#5ecfb1',backgroundColor:'rgba(94,207,177,0.08)',borderWidth:2,pointBackgroundColor:'#5ecfb1',pointRadius:4,tension:0.3,fill:true,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Energy: '+c.parsed.y},backgroundColor:'#1e2736',titleColor:'#8a9ab5',bodyColor:'#e8edf5',borderColor:'#2a3649',borderWidth:1}},scales:{x:{ticks:{color:'#5a6a82',font:{size:9},maxRotation:45},grid:{color:'#1e2736'}},y:{min:0,max:10,ticks:{color:'#5a6a82',font:{size:10},stepSize:1},grid:{color:'#1e2736'}}}}});
+}
+
+// ── APPOINTMENTS ──────────────────────────────────────────────────────────────
+window.addAppt = async () => {
+  const title=document.getElementById('appt-title').value.trim(), date=document.getElementById('appt-date').value;
+  if(!title){alert('Please enter a title.');return;} if(!date){alert('Please enter a date.');return;}
+  const appt={id:Date.now(),title,date,time:document.getElementById('appt-time').value,location:document.getElementById('appt-location').value.trim(),notes:document.getElementById('appt-notes').value.trim()};
+  appointments.push(appt);['appt-title','appt-date','appt-time','appt-location','appt-notes'].forEach(id=>document.getElementById(id).value='');
+  await saveAppts(); renderAppts();
+};
+window.deleteAppt = async id => { openModal('Delete appointment?','Remove this appointment?',async()=>{appointments=appointments.filter(a=>a.id!==id);await saveAppts();renderAppts();},true); };
+
+let editingApptId=null;
+window.openEditAppt = id => {
+  const a=appointments.find(x=>x.id===id); if(!a) return;
+  editingApptId=id;
+  document.getElementById('edit-appt-title').value=a.title||'';
+  document.getElementById('edit-appt-date').value=a.date||'';
+  document.getElementById('edit-appt-time').value=a.time||'';
+  document.getElementById('edit-appt-location').value=a.location||'';
+  document.getElementById('edit-appt-notes').value=a.notes||'';
+  document.getElementById('edit-appt-overlay').classList.add('show');
+};
+window.closeEditAppt = () => { document.getElementById('edit-appt-overlay').classList.remove('show'); editingApptId=null; };
+window.saveEditAppt = async () => {
+  const a=appointments.find(x=>x.id===editingApptId); if(!a) return;
+  a.title=document.getElementById('edit-appt-title').value.trim();
+  a.date=document.getElementById('edit-appt-date').value;
+  a.time=document.getElementById('edit-appt-time').value;
+  a.location=document.getElementById('edit-appt-location').value.trim();
+  a.notes=document.getElementById('edit-appt-notes').value.trim();
+  await saveAppts(); closeEditAppt(); renderAppts();
+};
+
+function renderAppts() {
+  const today=todayKey();
+  const sorted=[...appointments].sort((a,b)=>a.date.localeCompare(b.date));
+  const upcoming=sorted.filter(a=>a.date>=today);
+  const past=sorted.filter(a=>a.date<today).reverse();
+  const upEl=document.getElementById('upcoming-appts'); upEl.innerHTML='';
+  if(!upcoming.length) upEl.innerHTML='<div class="empty-state" style="padding:20px 0">No upcoming appointments.</div>';
+  upcoming.forEach(a=>{
+    const daysUntil=Math.ceil((new Date(a.date+' 00:00').getTime()-new Date().setHours(0,0,0,0))/86400000);
+    const badge=daysUntil===0?'<span class="appt-badge today-badge">Today</span>':daysUntil<=7?'<span class="appt-badge soon">In '+daysUntil+' days</span>':'';
+    const el=document.createElement('div'); el.className='appt-entry upcoming';
+    el.innerHTML='<div class="appt-header"><div><span class="appt-title">'+a.title+'</span> '+badge+'</div><div style="display:flex;gap:6px"><button class="appt-del" style="color:var(--accent);font-size:0.78rem" onclick="openEditAppt('+a.id+')">✎ Edit</button><button class="appt-del" onclick="deleteAppt('+a.id+')">×</button></div></div><div class="appt-meta"><span>'+fmtDateShort(a.date)+(a.time?' at '+a.time:'')+'</span>'+(a.location?' · '+a.location:'')+'</div>'+(a.notes?'<div class="appt-notes" style="white-space:pre-wrap">'+a.notes+'</div>':'');
+    upEl.appendChild(el);
+  });
+  const pastEl=document.getElementById('past-appts'); pastEl.innerHTML='';
+  if(!past.length) pastEl.innerHTML='<div class="empty-state" style="padding:20px 0">No past appointments.</div>';
+  past.slice(0,10).forEach(a=>{
+    const el=document.createElement('div'); el.className='appt-entry past-appt';
+    el.innerHTML='<div class="appt-header"><span class="appt-title">'+a.title+'</span><div style="display:flex;gap:6px"><button class="appt-del" style="color:var(--accent);font-size:0.78rem" onclick="openEditAppt('+a.id+')">✎ Edit</button><button class="appt-del" onclick="deleteAppt('+a.id+')">×</button></div></div><div class="appt-meta"><span>'+fmtDateShort(a.date)+(a.time?' at '+a.time:'')+'</span>'+(a.location?' · '+a.location:'')+'</div>'+(a.notes?'<div class="appt-notes" style="white-space:pre-wrap">'+a.notes+'</div>':'');
+    pastEl.appendChild(el);
+  });
+}
+
+// ── REORDER PRN MEDS ─────────────────────────────────────────────────────────
+let reorderList=[];
+window.openReorder = () => {
+  reorderList=[...prnMeds];
+  renderReorderList();
+  document.getElementById('reorder-overlay').classList.add('show');
+};
+window.closeReorder = () => document.getElementById('reorder-overlay').classList.remove('show');
+window.saveReorder = async () => { prnMeds=reorderList; await saveCfg(); renderPRNMeds(); closeReorder(); };
+window.moveReorderItem = (idx, dir) => {
+  const newIdx=idx+dir;
+  if(newIdx<0||newIdx>=reorderList.length) return;
+  [reorderList[idx],reorderList[newIdx]]=[reorderList[newIdx],reorderList[idx]];
+  renderReorderList();
+};
+function renderReorderList() {
+  const list=document.getElementById('reorder-list'); list.innerHTML='';
+  reorderList.forEach((med,i)=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px';
+    row.draggable=true;
+    row.dataset.idx=i;
+    row.ondragstart=e=>{e.dataTransfer.setData('text/plain',i);row.style.opacity='0.5';};
+    row.ondragend=()=>row.style.opacity='1';
+    row.ondragover=e=>{e.preventDefault();};
+    row.ondrop=e=>{e.preventDefault();const from=parseInt(e.dataTransfer.getData('text/plain'));const to=i;if(from===to)return;const item=reorderList.splice(from,1)[0];reorderList.splice(to,0,item);renderReorderList();};
+    row.innerHTML='<span style="color:var(--text3);font-size:1.2rem;cursor:grab">⠿</span><span style="flex:1;font-size:0.92rem;font-weight:500">'+med.name+'</span><div style="display:flex;flex-direction:column;gap:2px"><button onclick="moveReorderItem('+i+',-1)" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:0.9rem;padding:2px 6px" '+(i===0?'disabled':'')+'>▲</button><button onclick="moveReorderItem('+i+',1)" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:0.9rem;padding:2px 6px" '+(i===reorderList.length-1?'disabled':'')+'>▼</button></div>';
+    list.appendChild(row);
+  });
+}
+
+// ── GOALS ─────────────────────────────────────────────────────────────────────
+window.addGoal = async () => {
+  const name=document.getElementById('goal-name').value.trim(), type=document.getElementById('goal-type').value, target=parseFloat(document.getElementById('goal-target').value), notes=document.getElementById('goal-notes').value.trim();
+  if(!name){alert('Please enter a goal name.');return;} if(!target||isNaN(target)){alert('Please enter a target value.');return;}
+  goals.push({id:Date.now(),name,type,target,notes,current:0});
+  ['goal-name','goal-target','goal-notes'].forEach(id=>document.getElementById(id).value='');
+  await saveGoals(); renderGoals();
+};
+window.deleteGoal = async id => { openModal('Delete goal?','Remove this goal?',async()=>{goals=goals.filter(g=>g.id!==id);await saveGoals();renderGoals();},true); };
+window.updateGoalProgress = async (id,delta) => { const g=goals.find(g=>g.id===id);if(!g)return;g.current=Math.max(0,g.current+delta);await saveGoals();renderGoals(); };
+function getGoalCurrent(goal) {
+  if(goal.type==='daily-walks') { const t=getDay(todayKey()); return Object.values(t.walks||{}).filter(Boolean).length; }
+  if(goal.type==='weight-target') { const keys=Object.keys(weightLog).sort(); return keys.length?weightLog[keys[keys.length-1]].kg:null; }
+  if(goal.type==='pain-below') { const today=getPainDay(todayKey()); const avg=dayAvg(today); return avg?parseFloat(avg.toFixed(1)):null; }
+  return goal.current;
+}
+function renderGoals() {
+  const list=document.getElementById('goals-list'); list.innerHTML='';
+  if(!goals.length){list.innerHTML='<div class="empty-state">No goals yet. Add one below.</div>';return;}
+  goals.forEach(g=>{
+    const current=getGoalCurrent(g);
+    const pct=current!==null?Math.min((current/g.target)*100,100):0;
+    const color=pct>=100?'#5ecfb1':pct>=50?'#f0a847':'#7b9ef0';
+    const card=document.createElement('div'); card.className='goal-card';
+    let progressHtml='';
+    if(g.type==='custom') progressHtml='<div style="display:flex;gap:8px;margin-top:8px"><button onclick="updateGoalProgress('+g.id+',-1)" style="padding:6px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);cursor:pointer;font-family:DM Sans,sans-serif">−</button><button onclick="updateGoalProgress('+g.id+',1)" style="padding:6px 14px;background:var(--accent-dim);border:1px solid var(--accent);border-radius:var(--radius-sm);color:var(--accent);cursor:pointer;font-family:DM Sans,sans-serif">＋</button></div>';
+    card.innerHTML='<div class="goal-header"><span class="goal-name">'+g.name+'</span><button class="goal-del" onclick="deleteGoal('+g.id+')">×</button></div><div class="goal-progress-wrap"><div class="goal-progress-fill" style="width:'+pct+'%;background:'+color+'"></div></div><div class="goal-meta"><span>'+(current!==null?current:'—')+' / '+g.target+'</span><span style="color:'+color+'">'+Math.round(pct)+'%</span></div>'+(g.notes?'<div style="font-size:0.72rem;color:var(--text3);margin-top:6px;font-style:italic">'+g.notes+'</div>':'')+progressHtml;
+    list.appendChild(card);
+  });
+}
+
+// ── SYMPTOMS ──────────────────────────────────────────────────────────────────
+function getAllSymptomTags() { return [...DEFAULT_SYMPTOM_TAGS,...customSymptomTags]; }
+function buildSymptomTagBtns() {
+  const wrap=document.getElementById('symptom-tag-btns'); if(!wrap) return; wrap.innerHTML='';
+  getAllSymptomTags().forEach(tag=>{const btn=document.createElement('button');btn.className='symptom-tag-btn'+(selectedSymptomTags.has(tag)?' selected':'');btn.textContent=tag;btn.onclick=()=>{if(selectedSymptomTags.has(tag))selectedSymptomTags.delete(tag);else selectedSymptomTags.add(tag);buildSymptomTagBtns();};wrap.appendChild(btn);});
+}
+function buildSymptomSeverityBtns() {
+  const wrap=document.getElementById('symptom-severity-btns'); if(!wrap) return; wrap.innerHTML='';
+  ['Mild','Moderate','Severe'].forEach(sev=>{const btn=document.createElement('button');btn.className='symptom-sev-btn'+(selectedSeverity===sev?' sel-'+sev.toLowerCase():'');btn.textContent=sev;btn.onclick=()=>{selectedSeverity=sev;buildSymptomSeverityBtns();};wrap.appendChild(btn);});
+}
+window.logSymptom = async () => {
+  if(!selectedSymptomTags.size&&!document.getElementById('symptom-note').value.trim()){alert('Please select at least one tag or add a note.');return;}
+  const note=document.getElementById('symptom-note').value.trim();
+  if(!symptomLog[viewKey])symptomLog[viewKey]=[];
+  symptomLog[viewKey].push({ts:Date.now(),tags:[...selectedSymptomTags],note,severity:selectedSeverity});
+  selectedSymptomTags.clear();selectedSeverity=null;document.getElementById('symptom-note').value='';
+  buildSymptomTagBtns();buildSymptomSeverityBtns();await saveSymptoms();renderSymptoms();
+};
+window.deleteSymptom = async idx => { openModal('Remove entry?','Delete this symptom log?',async()=>{symptomLog[viewKey].splice(idx,1);await saveSymptoms();renderSymptoms();},true); };
+function renderSymptoms() {
+  document.getElementById('symptoms-title').textContent=fmtKey(viewKey)+"'s symptoms";
+  document.getElementById('symptoms-list-title').textContent='Entries — '+fmtKey(viewKey);
+  const list=document.getElementById('symptoms-list'); list.innerHTML='';
+  const entries=(symptomLog[viewKey]||[]).slice().reverse();
+  if(!entries.length){list.innerHTML='<div class="empty-state">No symptoms logged for this day.</div>';return;}
+  entries.forEach((e,ri)=>{const i=(symptomLog[viewKey]||[]).length-1-ri;const el=document.createElement('div');el.className='symptom-entry';el.innerHTML='<div class="symptom-entry-header"><span class="symptom-entry-time">'+fmt(e.ts)+'</span>'+(isToday()?'<button class="symptom-entry-del" onclick="deleteSymptom('+i+')">×</button>':'')+'</div><div class="symptom-entry-tags">'+e.tags.map(t=>'<span class="symptom-tag-pill">'+t+'</span>').join('')+(e.severity?'<span class="symptom-sev-pill '+e.severity.toLowerCase()+'">'+e.severity+'</span>':'')+'</div>'+(e.note?'<div class="symptom-entry-note">'+e.note+'</div>':'');list.appendChild(el);});
+}
+
+// ── OVERVIEW ──────────────────────────────────────────────────────────────────
+let overviewPainChart=null;
+
+function renderOverview() {
+  document.getElementById('overview-date-label').textContent=fmtKey(viewKey)+' at a glance';
+  const today=getPainDay(viewKey);
+  const t=getDay(viewKey);
+  const walkCount=Object.values(t.walks||{}).filter(Boolean).length;
+  const painAvgVal=dayAvg(today);
+  const pd=getPacingDay(viewKey);
+
+  // ── STATS ──
+  const statsEl=document.getElementById('overview-stats');
+  statsEl.innerHTML=
+    '<div class="stat-box"><div class="stat-val" style="color:'+(walkCount>0?'var(--accent)':'var(--text3)')+'">'+walkCount+'</div><div class="stat-label">Walks</div></div>'+
+    '<div class="stat-box"><div class="stat-val" style="color:'+(painAvgVal?painColor(painAvgVal):'var(--text3)')+'">'+( painAvgVal?fmtScore(parseFloat(painAvgVal.toFixed(1))):'—')+'</div><div class="stat-label">Avg Pain</div></div>'+
+    '<div class="stat-box"><div class="stat-val" style="color:'+(pd.pacingType==='green'?'var(--accent)':pd.pacingType==='amber'?'var(--amber)':pd.pacingType==='rest'?'var(--red)':'var(--text3)')+'">'+( pd.pacingType?pd.pacingType.charAt(0).toUpperCase()+pd.pacingType.slice(1):'—')+'</div><div class="stat-label">Day Type</div></div>';
+
+  // ── NEXT MED DUE ──
+  const nextMedEl=document.getElementById('overview-next-med'); nextMedEl.innerHTML='';
+  if(isToday()&&schedMeds.length) {
+    const now=new Date(); const nowMins=now.getHours()*60+now.getMinutes();
+    const dayData=getDay(viewKey); if(!dayData.scheduledDoses) dayData.scheduledDoses={};
+    let nextSlot=null, nextMedName=null, nextMins=Infinity;
+    schedMeds.forEach(med=>{
+      (med.times||[]).forEach(t=>{
+        const [hh,mm]=t.split(':').map(Number), slotMins=hh*60+mm;
+        const key=med.id+'_'+t, taken=!!(dayData.scheduledDoses[key]&&!dayData.scheduledDoses[key].skipped);
+        if(!taken&&slotMins>=nowMins&&slotMins<nextMins){nextMins=slotMins;nextSlot=t;nextMedName=med.name;}
+      });
+    });
+    if(nextSlot) {
+      const diffMins=nextMins-nowMins;
+      const diffStr=diffMins<=0?'Now':diffMins<60?diffMins+'m':Math.floor(diffMins/60)+'h '+(diffMins%60)+'m';
+      nextMedEl.innerHTML='<div style="background:var(--accent-dim);border:1px solid var(--accent);border-radius:var(--radius);padding:14px 16px;display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:0.72rem;font-weight:600;color:var(--accent);margin-bottom:3px">NEXT MEDICATION</div><div style="font-size:0.95rem;font-weight:600">'+nextMedName+'</div></div><div style="text-align:right"><div style="font-family:DM Mono,monospace;font-size:1.1rem;font-weight:600;color:var(--accent)">'+nextSlot+'</div><div style="font-size:0.72rem;color:var(--text3)">in '+diffStr+'</div></div></div>';
+    }
+  }
+
+  // ── QUICK LOG BUTTONS ──
+  const quickEl=document.getElementById('overview-quick-log'); quickEl.innerHTML='';
+  if(isToday()) {
+    const wrap=document.createElement('div');
+    wrap.innerHTML='<p class="section-title" style="margin-bottom:8px">Quick log</p>';
+    const btns=document.createElement('div'); btns.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px';
+    const quickActions=[
+      {label:'💊 PRN dose',onclick:'switchTab(document.querySelector(\'[data-tab="meds"]\'))'},
+      {label:'😣 Pain now',onclick:'switchTab(document.querySelector(\'[data-tab="pain"]\'));setTimeout(()=>document.querySelector(\'.pain-subtab[data-sub="log"]\').click(),100)'},
+      {label:'🍽️ Food',onclick:'switchTab(document.querySelector(\'[data-tab="food"]\'))'},
+      {label:'🚶 Walk',onclick:'switchTab(document.querySelector(\'[data-tab="walk"]\'))'},
+      {label:'⚖️ Weight',onclick:'switchTab(document.querySelector(\'[data-tab="weight"]\'))'},
+      {label:'😴 Rest',onclick:'switchTab(document.querySelector(\'[data-tab="pacing"]\'))'},
+    ];
+    quickActions.forEach(a=>{
+      const btn=document.createElement('button');
+      btn.style.cssText='padding:10px 4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);font-family:Plus Jakarta Sans,sans-serif;font-size:0.75rem;font-weight:500;color:var(--text2);cursor:pointer;text-align:center;transition:border-color 0.15s';
+      btn.textContent=a.label;
+      btn.onclick=()=>eval(a.onclick);
+      btn.onmouseover=()=>btn.style.borderColor='var(--accent)';
+      btn.onmouseout=()=>btn.style.borderColor='var(--border)';
+      btns.appendChild(btn);
+    });
+    wrap.appendChild(btns); quickEl.appendChild(wrap);
+  }
+
+  // ── TODAY'S SCHEDULE SUMMARY ──
+  const schedEl=document.getElementById('overview-schedule'); schedEl.innerHTML='';
+  if(schedMeds.length) {
+    const dayData=getDay(viewKey); if(!dayData.scheduledDoses) dayData.scheduledDoses={};
+    const wrap=document.createElement('div');
+    wrap.innerHTML='<p class="section-title" style="margin-bottom:8px">📅 Today\'s schedule</p>';
+    const allSlots=[];
+    schedMeds.forEach(med=>{(med.times||[]).forEach(t=>{const key=med.id+'_'+t,taken=!!(dayData.scheduledDoses[key]&&!dayData.scheduledDoses[key].skipped),skipped=!!(dayData.scheduledDoses[key]&&dayData.scheduledDoses[key].skipped);allSlots.push({name:med.name,time:t,taken,skipped});});});
+    allSlots.sort((a,b)=>a.time.localeCompare(b.time));
+    allSlots.forEach(slot=>{
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px';
+      const dot=slot.taken?'<span style="color:var(--accent);font-size:1rem">✓</span>':slot.skipped?'<span style="color:var(--text3);font-size:0.8rem">✕</span>':'<span style="color:var(--text3);font-size:0.8rem">○</span>';
+      row.innerHTML='<div style="display:flex;align-items:center;gap:10px">'+dot+'<span style="font-size:0.85rem'+(slot.taken?';color:var(--text3)':'')+'">'+(slot.taken?'<s>':'')+slot.name+(slot.taken?'</s>':'')+'</span></div><span style="font-family:DM Mono,monospace;font-size:0.78rem;color:'+(slot.taken?'var(--accent)':'var(--text3)')+'">'+slot.time+'</span>';
+      wrap.appendChild(row);
+    });
+    if(!allSlots.length) wrap.innerHTML+='<p style="font-size:0.82rem;color:var(--text3)">No scheduled meds set up yet.</p>';
+    schedEl.appendChild(wrap);
+  }
+
+  // ── PAIN TREND (7 days) ──
+  const trendEl=document.getElementById('overview-pain-trend'); trendEl.innerHTML='';
+  const last7=[]; const dd=new Date();
+  for(let i=6;i>=0;i--){const d2=new Date(dd);d2.setDate(dd.getDate()-i);const k=d2.getFullYear()+'-'+pad(d2.getMonth()+1)+'-'+pad(d2.getDate());last7.push(k);}
+  const trendData=last7.map(k=>{const avg=dayAvg(painLog[k]||[]);return avg?parseFloat(avg.toFixed(1)):null;});
+  if(trendData.some(v=>v!==null)){
+    const wrap=document.createElement('div'); wrap.className='card'; wrap.style.marginBottom='0';
+    wrap.innerHTML='<p class="section-title" style="margin-bottom:10px">📈 Pain — last 7 days</p><div style="position:relative;width:100%;height:120px"><canvas id="overview-pain-chart"></canvas></div>';
+    trendEl.appendChild(wrap);
+    setTimeout(()=>{
+      const ctx=document.getElementById('overview-pain-chart');if(!ctx)return;
+      if(overviewPainChart)overviewPainChart.destroy();
+      overviewPainChart=new Chart(ctx.getContext('2d'),{type:'line',data:{labels:last7.map(fmtDateShort),datasets:[{data:trendData,borderColor:'#e05c6a',backgroundColor:'rgba(224,92,106,0.06)',borderWidth:2,pointBackgroundColor:trendData.map(v=>v?painColor(v):'transparent'),pointRadius:4,tension:0.3,fill:true,spanGaps:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Pain: '+c.parsed.y},backgroundColor:'#faf7f2',titleColor:'#4a5568',bodyColor:'#1e2530',borderColor:'#d4cdc2',borderWidth:1}},scales:{x:{ticks:{color:'#7a8699',font:{size:9}},grid:{color:'#ede8df'}},y:{min:0,max:10,ticks:{color:'#7a8699',font:{size:9},stepSize:2},grid:{color:'#ede8df'}}}}});
+    },50);
+  }
+
+  // ── UPCOMING APPOINTMENTS ──
+  const apptEl=document.getElementById('overview-appts'); apptEl.innerHTML='';
+  const todayKey2=todayKey();
+  const upcomingAppts=appointments.filter(a=>a.date>=todayKey2).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3);
+  if(upcomingAppts.length){
+    const h=document.createElement('div');
+    h.innerHTML='<p class="section-title" style="margin-bottom:8px">📅 Upcoming appointments</p>';
+    upcomingAppts.forEach(a=>{
+      const d=Math.ceil((new Date(a.date+' 00:00').getTime()-new Date().setHours(0,0,0,0))/86400000);
+      h.innerHTML+='<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px"><span style="font-size:0.85rem">'+a.title+'</span><span style="font-size:0.72rem;color:var(--text3);font-family:DM Mono,monospace">'+(d===0?'Today':d===1?'Tomorrow':'In '+d+' days')+'</span></div>';
+    });
+    apptEl.appendChild(h);
+  }
+
+  // ── GOALS ──
+  const goalsEl=document.getElementById('overview-goals'); goalsEl.innerHTML='';
+  if(goals.length){
+    const h=document.createElement('div');
+    h.innerHTML='<p class="section-title" style="margin-bottom:8px">🎯 Goals</p>';
+    goals.slice(0,3).forEach(g=>{
+      const current=getGoalCurrent(g);const pct=current!==null?Math.min((current/g.target)*100,100):0;const color=pct>=100?'var(--accent)':pct>=50?'var(--amber)':'var(--blue)';
+      h.innerHTML+='<div style="padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px"><div style="display:flex;justify-content:space-between;font-size:0.82rem;margin-bottom:6px"><span>'+g.name+'</span><span style="color:'+color+';font-family:DM Mono,monospace">'+(current!==null?current:'—')+' / '+g.target+'</span></div><div style="background:var(--surface2);border-radius:4px;height:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px"></div></div></div>';
+    });
+    goalsEl.appendChild(h);
+  }
+}
+
+// ── SETTINGS: SCHED MED CONFIG ────────────────────────────────────────────────
+function renderSchedMedConfig() {
+  const list=document.getElementById('sched-med-config-list'); list.innerHTML='';
+  schedMeds.forEach(med=>{
+    const card=document.createElement('div'); card.className='sched-med-config';
+    const header=document.createElement('div'); header.className='sched-med-config-header';
+    header.innerHTML='<span class="sched-med-config-name">'+med.name+'</span><button class="sched-med-config-del" onclick="deleteSchedMed(\''+med.id+'\')">✕ Remove</button>';
+    card.appendChild(header);
+    // Times
+    const timeTags=document.createElement('div'); timeTags.className='time-tags'; timeTags.id='tt-'+med.id;
+    (med.times||[]).forEach(t=>{const tag=document.createElement('div');tag.className='time-tag';tag.innerHTML='<span>'+t+'</span><button class="time-tag-del" onclick="removeSchedTime(\''+med.id+'\',\''+t+'\')">×</button>';timeTags.appendChild(tag);});
+    card.appendChild(timeTags);
+    // Add time
+    const addRow=document.createElement('div'); addRow.className='add-time-row';
+    addRow.innerHTML='<input type="time" id="at-'+med.id+'"><button onclick="addSchedTime(\''+med.id+'\')">＋ Add time</button>';
+    card.appendChild(addRow);
+    // Hours
+    const hoursRow=document.createElement('div'); hoursRow.style.cssText='margin-top:10px;font-size:0.78rem;color:var(--text3);display:flex;align-items:center;gap:8px';
+    hoursRow.innerHTML='Gap between doses: <input type="number" value="'+med.hours+'" min="0" step="1" style="width:60px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:DM Mono,monospace;font-size:0.85rem;padding:4px 8px;outline:none" onchange="updateSchedHours(\''+med.id+'\',this.value)"> hours';
+    card.appendChild(hoursRow);
+    // PRN toggle
+    const prnRow=document.createElement('div'); prnRow.className='prn-toggle-row';
+    prnRow.innerHTML='Also track as PRN (shared timer) <label class="toggle-switch"><input type="checkbox" '+(med.isPRN?'checked':'')+' onchange="toggleSchedPRN(\''+med.id+'\',this.checked)"><span class="toggle-slider"></span></label>';
+    card.appendChild(prnRow);
+    list.appendChild(card);
+  });
+
+  // Settings PRN list
+  const prnSettingsList=document.getElementById('settings-prn-list'); prnSettingsList.innerHTML='';
+  prnMeds.forEach(med=>{const el=document.createElement('div');el.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px';el.innerHTML='<span style="font-size:0.88rem">'+med.name+'</span><span style="font-size:0.72rem;color:var(--text3)">every '+med.hours+'h</span>';prnSettingsList.appendChild(el);});
+  if(!prnMeds.length) prnSettingsList.innerHTML='<p style="font-size:0.78rem;color:var(--text3)">No PRN medications added yet.</p>';
+}
+window.addSchedMed = async () => {
+  const name=document.getElementById('sched-new-name').value.trim(), hoursRaw=document.getElementById('sched-new-hours').value, hours=hoursRaw===''?4:parseInt(hoursRaw), strRaw=document.getElementById('sched-new-strengths').value.trim(), isPRN=document.getElementById('sched-new-prn-toggle').checked;
+  if(!name){alert('Please enter a name.');return;}
+  if(!schedNewTimes.length){alert('Please add at least one scheduled time.');return;}
+  const strengths=strRaw?strRaw.split(',').map(s=>s.trim()).filter(Boolean):null;
+  const id='sched-'+name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')+'-'+Date.now();
+  const nm={id,name,times:[...schedNewTimes].sort(),hours,isPRN};if(strengths)nm.strengths=strengths;
+  schedMeds.push(nm);
+  if(isPRN&&!prnMeds.find(m=>m.name.toLowerCase()===name.toLowerCase())) {
+    const prnId='prn-'+name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')+'-'+Date.now();
+    prnMeds.push({id:prnId,name,hours,strengths:strengths||null});
+  }
+  schedNewTimes=[];document.getElementById('sched-new-name').value='';document.getElementById('sched-new-hours').value='';document.getElementById('sched-new-strengths').value='';document.getElementById('sched-new-prn-toggle').checked=false;document.getElementById('sched-new-times').innerHTML='';
+  await saveCfg(); renderSchedMedConfig(); renderSchedule();
+};
+window.addSchedNewTime = () => {
+  const t=document.getElementById('sched-new-time').value; if(!t)return;
+  if(schedNewTimes.includes(t)){alert('Time already added.');return;}
+  schedNewTimes.push(t); document.getElementById('sched-new-time').value='';
+  const wrap=document.getElementById('sched-new-times'); wrap.innerHTML='';
+  schedNewTimes.sort().forEach(ti=>{const tag=document.createElement('div');tag.className='time-tag';tag.innerHTML='<span>'+ti+'</span><button class="time-tag-del" onclick="removeNewTime(\''+ti+'\')">×</button>';wrap.appendChild(tag);});
+};
+window.removeNewTime = t => { schedNewTimes=schedNewTimes.filter(x=>x!==t); const wrap=document.getElementById('sched-new-times');wrap.innerHTML='';schedNewTimes.sort().forEach(ti=>{const tag=document.createElement('div');tag.className='time-tag';tag.innerHTML='<span>'+ti+'</span><button class="time-tag-del" onclick="removeNewTime(\''+ti+'\')">×</button>';wrap.appendChild(tag);}); };
+window.addSchedTime = async (medId) => { const t=document.getElementById('at-'+medId).value;if(!t)return;const med=schedMeds.find(m=>m.id===medId);if(!med)return;if(!med.times.includes(t)){med.times.push(t);med.times.sort();}document.getElementById('at-'+medId).value='';await saveCfg();renderSchedMedConfig();renderSchedule(); };
+window.removeSchedTime = async (medId,t) => { const med=schedMeds.find(m=>m.id===medId);if(!med)return;med.times=med.times.filter(x=>x!==t);await saveCfg();renderSchedMedConfig();renderSchedule(); };
+window.updateSchedHours = async (medId,val) => { const med=schedMeds.find(m=>m.id===medId);if(!med)return;med.hours=parseInt(val)||4;await saveCfg(); };
+window.toggleSchedPRN = async (medId,checked) => { const med=schedMeds.find(m=>m.id===medId);if(!med)return;med.isPRN=checked;if(checked&&!prnMeds.find(m=>m.name.toLowerCase()===med.name.toLowerCase())){const prnId='prn-'+med.name.toLowerCase().replace(/\s+/g,'-')+'-'+Date.now();prnMeds.push({id:prnId,name:med.name,hours:med.hours,strengths:med.strengths||null});}await saveCfg();renderSchedMedConfig();renderPRNMeds(); };
+window.deleteSchedMed = async id => { const med=schedMeds.find(m=>m.id===id);openModal('Remove '+med.name+'?','Removes from scheduled list. PRN entry unaffected.',async()=>{schedMeds=schedMeds.filter(m=>m.id!==id);await saveCfg();renderSchedMedConfig();renderSchedule();},true); };
+
+// ── CUSTOM SYMPTOM TAGS ───────────────────────────────────────────────────────
+window.addCustomTag = async () => {
+  const val=document.getElementById('new-tag-input').value.trim(); if(!val)return;
+  if(getAllSymptomTags().includes(val)){alert('Tag already exists.');return;}
+  customSymptomTags.push(val); document.getElementById('new-tag-input').value='';
+  await saveCfg(); renderCustomTags(); buildSymptomTagBtns();
+};
+window.removeCustomTag = async tag => { customSymptomTags=customSymptomTags.filter(t=>t!==tag);await saveCfg();renderCustomTags();buildSymptomTagBtns(); };
+function renderCustomTags() {
+  const wrap=document.getElementById('custom-tag-list'); wrap.innerHTML='';
+  customSymptomTags.forEach(tag=>{const el=document.createElement('div');el.className='time-tag';el.innerHTML='<span>'+tag+'</span><button class="time-tag-del" onclick="removeCustomTag(\''+tag+'\')">×</button>';wrap.appendChild(el);});
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+window.switchTab = btn => {
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+btn.dataset.tab).classList.add('active');btn.classList.add('active');
+  if(btn.dataset.tab==='weight') renderWeight();
+  if(btn.dataset.tab==='walk') renderWalks();
+  if(btn.dataset.tab==='overview') renderOverview();
+  if(btn.dataset.tab==='pacing') { renderPacing(); renderPacingChart(); }
+  if(btn.dataset.tab==='symptoms') renderSymptoms();
+  if(btn.dataset.tab==='settings') { renderSchedMedConfig(); renderCustomTags(); const dm=document.getElementById('dark-mode-toggle');if(dm)dm.checked=document.body.classList.contains('dark-mode'); }
+  if(btn.dataset.tab==='appts') renderAppts();
+  if(btn.dataset.tab==='goals') renderGoals();
+  if(btn.dataset.tab==='pain'){const sub=document.querySelector('.pain-subtab.active');if(sub&&sub.dataset.sub==='compare')renderPainCompare();else renderPainDay();}
+};
+
+// ── COUNTDOWN TICK ────────────────────────────────────────────────────────────
+setInterval(()=>{
+  if(!isToday()) return;
+  prnMeds.forEach(m=>{
+    const {rec}=getCarriedRecord(m.id,m.hours); if(!rec||m.noTimer) return;
+    const timerTs=rec.topupTs||rec.ts,c=cdown(timerTs,m.hours);
+    const el=document.getElementById('cd-'+m.id);
+    if(el){ if(c==='Ready') renderPRNMeds(); else el.textContent=c; }
+    const todayRec=(state[todayKey()]||{}).meds?.[m.id];
+    const isOxy=m.name.toLowerCase().includes('oxycodone');
+    if(isOxy&&todayRec&&!todayRec.topupTs){ const availAt=todayRec.ts+TOPUP_AFTER_HOURS*3600000,tuBtn=document.getElementById('topup-btn-'+m.id),tuInfo=document.getElementById('topup-info-'+m.id); if(Date.now()>=availAt){if(tuBtn&&tuBtn.classList.contains('disabled'))renderPRNMeds();}else if(tuInfo)tuInfo.textContent='Available in ~'+Math.ceil((availAt-Date.now())/60000)+' min'; }
+  });
+  // Refresh schedule every minute to update missed/due-soon
+  if(new Date().getSeconds()===0) renderSchedule();
+},1000);
+
+// ── DARK MODE ─────────────────────────────────────────────────────────────────
+window.toggleDarkMode = checked => {
+  document.body.classList.toggle('dark-mode', checked);
+  localStorage.setItem('darkMode', checked ? '1' : '0');
+};
+// Apply on load
+if(localStorage.getItem('darkMode')==='1') {
+  document.body.classList.add('dark-mode');
+  document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('dark-mode-toggle');
+    if(toggle) toggle.checked = true;
+  });
+}
+
+// ── WEEKLY SUMMARY ────────────────────────────────────────────────────────────
+window.renderWeeklySummary = () => {
+  const el = document.getElementById('weekly-summary-content'); el.innerHTML='';
+  const last7=[]; const now=new Date();
+  for(let i=6;i>=0;i--){const d=new Date(now);d.setDate(now.getDate()-i);const k=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());last7.push(k);}
+  const painAvgs=last7.map(k=>{const avg=dayAvg(painLog[k]||[]);return avg?parseFloat(avg.toFixed(1)):null;});
+  const walks=last7.map(k=>{const t=state[k]||{};return Object.values(t.walks||{}).filter(Boolean).length;});
+  const weights=last7.map(k=>weightLog[k]?weightLog[k].kg:null).filter(Boolean);
+  const avgPain=painAvgs.filter(Boolean).length?parseFloat((painAvgs.filter(Boolean).reduce((a,b)=>a+b,0)/painAvgs.filter(Boolean).length).toFixed(1)):null;
+  const totalWalks=walks.reduce((a,b)=>a+b,0);
+  const latestWeight=weights.length?weights[weights.length-1]:null;
+
+  el.innerHTML=
+    '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-top:10px">'+
+    '<p style="font-size:0.78rem;font-weight:600;color:var(--text2);margin-bottom:12px">Last 7 days</p>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
+    '<div><div style="font-family:DM Mono,monospace;font-size:1.2rem;font-weight:600;color:'+(avgPain?painColor(avgPain):'var(--text3)')+'">'+(avgPain||'—')+'</div><div style="font-size:0.7rem;color:var(--text3);margin-top:2px">Avg pain score</div></div>'+
+    '<div><div style="font-family:DM Mono,monospace;font-size:1.2rem;font-weight:600;color:var(--accent)">'+totalWalks+'</div><div style="font-size:0.7rem;color:var(--text3);margin-top:2px">Total walks</div></div>'+
+    '<div><div style="font-family:DM Mono,monospace;font-size:1.2rem;font-weight:600;color:var(--accent)">'+(latestWeight?latestWeight.toFixed(1)+' kg':'—')+'</div><div style="font-size:0.7rem;color:var(--text3);margin-top:2px">Latest weight</div></div>'+
+    '<div><div style="font-family:DM Mono,monospace;font-size:1.2rem;font-weight:600;color:var(--accent)">'+Math.round(totalWalks/7*10)/10+'</div><div style="font-size:0.7rem;color:var(--text3);margin-top:2px">Avg walks/day</div></div>'+
+    '</div></div>';
+};
+
+// ── EXPORT DATA ───────────────────────────────────────────────────────────────
+window.exportData = () => {
+  let csv = 'Date,Pain Avg,Pain Low,Pain High,Walks,Weight (kg),Pacing Day\n';
+  const allKeys=[...new Set([...Object.keys(painLog),...Object.keys(state),...Object.keys(weightLog),...Object.keys(pacingLog)])].sort();
+  allKeys.forEach(k=>{
+    const pain=painLog[k]||[]; const scores=pain.map(e=>e.score);
+    const avg=scores.length?parseFloat((scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1)):'';
+    const low=scores.length?Math.min(...scores):''; const high=scores.length?Math.max(...scores):'';
+    const walks=Object.values((state[k]||{}).walks||{}).filter(Boolean).length;
+    const weight=weightLog[k]?weightLog[k].kg:'';
+    const pacing=(pacingLog[k]||{}).pacingType||'';
+    csv+=k+','+avg+','+low+','+high+','+walks+','+weight+','+pacing+'\n';
+  });
+  const blob=new Blob([csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='home-recovery-'+todayKey()+'.csv'; a.click();
+  URL.revokeObjectURL(url);
+};
+
+// ── FIREBASE SETTINGS ─────────────────────────────────────────────────────────
+window.saveFirebaseConfig = () => {
+  const val=document.getElementById('firebase-config-input').value.trim();
+  try { const cfg=JSON.parse(val); localStorage.setItem('firebaseConfig',JSON.stringify(cfg)); document.getElementById('firebase-status').textContent='✓ Saved. Reload the page to connect.'; document.getElementById('firebase-status').style.color='var(--accent)'; }
+  catch { document.getElementById('firebase-status').textContent='Invalid JSON. Please paste the config object exactly.'; document.getElementById('firebase-status').style.color='var(--red)'; }
+};
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+setSync('load');
+(async()=>{
+  try{
+    const [cfgSnap,dataSnap,wSnap,pSnap,wlSnap,apptSnap,goalsSnap,pacingSnap,symSnap]=await Promise.all([
+      getDoc(CONFIG_REF),getDoc(DATA_REF),getDoc(WEIGHT_REF),getDoc(PAIN_REF),getDoc(WISHLIST_REF),
+      getDoc(APPT_REF),getDoc(GOALS_REF),getDoc(PACING_REF),getDoc(SYMPTOM_REF)
+    ]);
+    if(cfgSnap.exists()){const cfg=cfgSnap.data();schedMeds=cfg.schedMeds||[];prnMeds=cfg.prnMeds||[];customSymptomTags=cfg.customSymptomTags||[];}
+    state=dataSnap.exists()?dataSnap.data():{};
+    weightLog=wSnap.exists()?wSnap.data():{};
+    painLog=pSnap.exists()?pSnap.data():{};
+    wishlist=wlSnap.exists()&&wlSnap.data().items?wlSnap.data().items:[];
+    appointments=apptSnap.exists()&&apptSnap.data().items?apptSnap.data().items:[];
+    goals=goalsSnap.exists()&&goalsSnap.data().items?goalsSnap.data().items:[];
+    pacingLog=pacingSnap.exists()?pacingSnap.data():{};
+    symptomLog=symSnap.exists()?symSnap.data():{};
+
+    document.getElementById('loading').style.display='none';
+    setSync('ok');
+
+    buildScoreGrid('pain-score-grid',()=>selPainScore,v=>{selPainScore=v;});
+    buildScoreGrid('pain-extra-score-grid',()=>selExtraScore,v=>{selExtraScore=v;});
+    const now=new Date(); document.getElementById('pain-extra-time').value=pad(now.getHours())+':'+pad(now.getMinutes());
+
+    updateDateHeader();
+    buildSymptomTagBtns(); buildSymptomSeverityBtns();
+    renderSchedule(); renderPRNMeds(); renderFood(); renderWalks(); renderWeight();
+    renderPainDay(); renderWishlist(); renderOverview(); renderPacing(); renderAppts(); renderGoals();
+
+    onSnapshot(DATA_REF,snap=>{if(snap.exists()){state=snap.data();renderSchedule();renderPRNMeds();renderFood();renderWalks();}setSync('ok');});
+    onSnapshot(CONFIG_REF,snap=>{if(snap.exists()){const cfg=snap.data();schedMeds=cfg.schedMeds||[];prnMeds=cfg.prnMeds||[];customSymptomTags=cfg.customSymptomTags||[];renderSchedule();renderPRNMeds();}});
+    onSnapshot(WEIGHT_REF,snap=>{if(snap.exists()){weightLog=snap.data();if(document.getElementById('tab-weight').classList.contains('active'))renderWeight();}setSync('ok');});
+    onSnapshot(PAIN_REF,snap=>{if(snap.exists()){painLog=snap.data();const pt=document.getElementById('tab-pain');if(pt.classList.contains('active')){const sub=document.querySelector('.pain-subtab.active');if(sub){if(sub.dataset.sub==='today')renderPainDay();if(sub.dataset.sub==='compare')renderPainCompare();}}}setSync('ok');});
+    onSnapshot(WISHLIST_REF,snap=>{if(snap.exists()&&snap.data().items){wishlist=snap.data().items;renderWishlist();}setSync('ok');});
+    onSnapshot(APPT_REF,snap=>{if(snap.exists()&&snap.data().items){appointments=snap.data().items;if(document.getElementById('tab-appts').classList.contains('active'))renderAppts();}setSync('ok');});
+    onSnapshot(GOALS_REF,snap=>{if(snap.exists()&&snap.data().items){goals=snap.data().items;if(document.getElementById('tab-goals').classList.contains('active'))renderGoals();}setSync('ok');});
+    onSnapshot(PACING_REF,snap=>{if(snap.exists()){pacingLog=snap.data();if(document.getElementById('tab-pacing').classList.contains('active'))renderPacing();}setSync('ok');});
+    onSnapshot(SYMPTOM_REF,snap=>{if(snap.exists()){symptomLog=snap.data();if(document.getElementById('tab-symptoms').classList.contains('active'))renderSymptoms();}setSync('ok');});
+
+    // ── PUSH NOTIFICATIONS ──────────────────────────────────────────────────
+    setTimeout(async()=>{
+      try {
+        if(!('serviceWorker' in navigator)||!('PushManager' in window)) return;
+        const reg = await navigator.serviceWorker.register('/home/firebase-messaging-sw.js');
+        const permission = await Notification.requestPermission();
+        if(permission !== 'granted') { console.log('Notification permission denied'); return; }
+        const { getMessaging, getToken } = await import('https://www.gstatic.com/firebasejs/12.11.0/firebase-messaging.js');
+        const { getApps } = await import('https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js');
+        const fbApp = getApps()[0];
+        const fcmMessaging = getMessaging(fbApp);
+        const token = await getToken(fcmMessaging, { vapidKey: 'BAuZRHV9EjQDfcUfffiddsVOyEWT_x466vnra-s6T_nQnZl8yFHmpDJNGZQtmRbwJXMIeJoBYzy7dJaX1KsxOJs', serviceWorkerRegistration: reg });
+        if(token) {
+          const tokensRef = doc(db,'recovery','fcmTokens');
+          const snap2 = await getDoc(tokensRef);
+          const existing = snap2.exists() ? snap2.data() : {};
+          existing.tokens = [...new Set([...(existing.tokens||[]), token])];
+          await setDoc(tokensRef, existing);
+          console.log('FCM token registered ✓');
+        }
+      } catch(e) { console.error('Notification init error:', e); }
+    }, 3000);
+
+  }catch(e){console.error(e);document.getElementById('loading').style.display='none';setSync('err');}
+})();
+</script>
+</body>
+</html>
